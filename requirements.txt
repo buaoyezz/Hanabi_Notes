@@ -1,0 +1,7 @@
+PySide6>=6.5.0
+pywin32>=300
+pillow>=10.0.0
+psutil>=5.9.0
+keyboard>=0.13.5
+ctypes-callable>=1.0.0
+imageio>=2.31.0 
