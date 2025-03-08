@@ -201,6 +201,14 @@ class CheckboxSettingItem(SettingItem):
             self._set_autostart(is_checked)
         elif self.config_key == "skip_uac":
             self._set_skip_uac(is_checked)
+        elif self.config_key == "start_minimized":
+            # 开机最小化启动只需要保存配置，不需要额外操作
+            log.info(f"开机最小化启动设置已更新: {is_checked}")
+            # 如果开机自启动已启用，需要更新注册表中的命令
+            if config_manager.get_config('system', 'autostart', False):
+                self._set_autostart(True)  # 重新设置自启动以更新命令行参数
+        elif self.config_key == "run_as_admin":
+            self._set_run_as_admin(is_checked)
         
     def _set_autostart(self, enable):
         try:
@@ -216,15 +224,41 @@ class CheckboxSettingItem(SettingItem):
             )
             
             if enable:
-                # 添加开机自启动
-                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, f'"{app_path}"')
-                log.info(f"已设置开机自启动: {app_path}")
-                show_info("已设置开机自启动")
+                # 检查是否需要最小化启动
+                start_minimized = config_manager.get_config('system', 'start_minimized', False)
+                # 检查是否需要管理员启动
+                run_as_admin = config_manager.get_config('system', 'run_as_admin', False)
+                
+                # 添加开机自启动，如果需要最小化启动则添加参数
+                command = f'"{app_path}"'
+                if start_minimized:
+                    command += ' --minimized'
+                
+                # 如果需要管理员启动，使用特殊命令
+                if run_as_admin:
+                    # 使用任务计划程序以管理员身份启动
+                    task_name = "ImagineSnapAdminAutostart"
+                    # 创建任务计划
+                    self._create_admin_task(task_name, app_path, start_minimized)
+                    # 注册表中仍然添加普通启动命令，作为备份
+                    winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, command)
+                    log.info(f"已设置管理员身份开机自启动任务: {task_name}")
+                    show_info("已设置以管理员身份开机自启动")
+                else:
+                    # 普通启动
+                    winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, command)
+                    log.info(f"已设置开机自启动: {command}")
+                    show_info("已设置开机自启动")
             else:
                 # 删除开机自启动
                 try:
                     winreg.DeleteValue(key, app_name)
                     log.info("已取消开机自启动")
+                    
+                    # 删除管理员启动任务
+                    task_name = "ImagineSnapAdminAutostart"
+                    self._delete_admin_task(task_name)
+                    
                     show_info("已取消开机自启动")
                 except FileNotFoundError:
                     # 键不存在，忽略错误
@@ -236,30 +270,199 @@ class CheckboxSettingItem(SettingItem):
             log.error(f"设置开机自启动失败: {str(e)}")
             show_error(f"设置开机自启动失败: {str(e)}")
             
+    def _create_admin_task(self, task_name, app_path, start_minimized=False):
+        """创建管理员权限的任务计划"""
+        try:
+            import subprocess
+            
+            # 构建命令行参数
+            args = app_path
+            if start_minimized:
+                args += " --minimized"
+                
+            # 创建任务计划XML文件
+            xml_content = f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Imagine Snap 管理员权限自启动任务</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <RunLevel>HighestAvailable</RunLevel>
+      <UserId>{os.environ.get('USERNAME')}</UserId>
+      <LogonType>InteractiveToken</LogonType>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>false</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>"{app_path}"</Command>
+      <Arguments>{'' if not start_minimized else '--minimized'}</Arguments>
+    </Exec>
+  </Actions>
+</Task>"""
+            
+            # 保存XML文件
+            temp_xml_path = os.path.join(os.environ.get('TEMP'), f"{task_name}.xml")
+            with open(temp_xml_path, 'w', encoding='utf-16') as f:
+                f.write(xml_content)
+                
+            # 创建任务
+            subprocess.run(["schtasks", "/create", "/tn", task_name, "/xml", temp_xml_path, "/f"], check=True)
+            
+            # 删除临时XML文件
+            os.remove(temp_xml_path)
+            
+            log.info(f"已创建管理员权限任务计划: {task_name}")
+            
+        except Exception as e:
+            log.error(f"创建管理员权限任务计划失败: {str(e)}")
+            show_error(f"创建管理员权限任务计划失败: {str(e)}")
+            
+    def _delete_admin_task(self, task_name):
+        """删除管理员权限的任务计划"""
+        try:
+            import subprocess
+            
+            # 检查任务是否存在
+            result = subprocess.run(["schtasks", "/query", "/tn", task_name], capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # 任务存在，删除它
+                subprocess.run(["schtasks", "/delete", "/tn", task_name, "/f"], check=True)
+                log.info(f"已删除管理员权限任务计划: {task_name}")
+            else:
+                log.info(f"管理员权限任务计划不存在: {task_name}")
+                
+        except Exception as e:
+            log.error(f"删除管理员权限任务计划失败: {str(e)}")
+
     def _set_skip_uac(self, enable):
         try:
-            # 仅在管理员权限下执行
-            if not ctypes.windll.shell32.IsUserAnAdmin():
-                show_warning("需要管理员权限才能修改UAC设置")
-                # 回滚设置
-                self.checkbox.setChecked(not enable)
-                config_manager.set_config(self.config_section, self.config_key, not enable)
-                return
-                
             # 获取应用程序路径
             app_path = sys.executable
+            app_name = os.path.basename(app_path)
             
-            # UAC相关操作 (这里仅作示例，实际实现可能需要更复杂的操作)
+            # 创建清单文件路径
+            manifest_dir = os.path.dirname(app_path)
+            manifest_path = os.path.join(manifest_dir, f"{app_name}.manifest")
+            
             if enable:
-                log.info("已设置跳过UAC")
+                # 如果同时启用了管理员启动，需要提示用户
+                if config_manager.get_config('system', 'run_as_admin', False):
+                    show_warning("注意：'跳过UAC验证'和'以管理员身份启动'设置冲突，已自动禁用'以管理员身份启动'")
+                    # 更新管理员启动设置
+                    config_manager.set_config('system', 'run_as_admin', False)
+                    # 如果设置页面中有管理员启动设置控件，更新其状态
+                    if hasattr(self.parent(), 'admin_setting') and self.parent().admin_setting:
+                        self.parent().admin_setting.checkbox.setChecked(False)
+                
+                # 创建跳过UAC的清单文件
+                manifest_content = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>"""
+                
+                # 写入清单文件
+                with open(manifest_path, 'w', encoding='utf-8') as f:
+                    f.write(manifest_content)
+                
+                log.info(f"已创建跳过UAC的清单文件: {manifest_path}")
                 show_info("已设置跳过UAC，应用程序将不再请求管理员权限")
             else:
-                log.info("已取消跳过UAC")
-                show_info("已重新启用UAC")
+                # 删除清单文件
+                if os.path.exists(manifest_path):
+                    os.remove(manifest_path)
+                    log.info(f"已删除清单文件: {manifest_path}")
+                    show_info("已取消跳过UAC，应用程序可能需要管理员权限")
+                else:
+                    log.info("清单文件不存在，无需删除")
+                    show_info("已取消跳过UAC")
                 
         except Exception as e:
             log.error(f"设置UAC失败: {str(e)}")
             show_error(f"设置UAC失败: {str(e)}")
+
+    def _set_run_as_admin(self, enable):
+        try:
+            # 获取应用程序路径
+            app_path = sys.executable
+            app_name = os.path.basename(app_path)
+            
+            # 创建清单文件路径
+            manifest_dir = os.path.dirname(app_path)
+            manifest_path = os.path.join(manifest_dir, f"{app_name}.manifest")
+            
+            if enable:
+                # 创建要求管理员权限的清单文件
+                manifest_content = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>"""
+                
+                # 写入清单文件
+                with open(manifest_path, 'w', encoding='utf-8') as f:
+                    f.write(manifest_content)
+                
+                log.info(f"已创建管理员权限清单文件: {manifest_path}")
+                show_info("已设置以管理员身份启动，应用程序将在下次启动时请求管理员权限")
+                
+                # 如果同时启用了跳过UAC，需要提示用户
+                if config_manager.get_config('system', 'skip_uac', False):
+                    show_warning("注意：'以管理员身份启动'和'跳过UAC验证'设置冲突，已自动禁用'跳过UAC验证'")
+                    # 更新跳过UAC设置
+                    config_manager.set_config('system', 'skip_uac', False)
+                    # 如果设置页面中有UAC设置控件，更新其状态
+                    if hasattr(self.parent(), 'uac_setting') and self.parent().uac_setting:
+                        self.parent().uac_setting.checkbox.setChecked(False)
+            else:
+                # 删除清单文件
+                if os.path.exists(manifest_path):
+                    os.remove(manifest_path)
+                    log.info(f"已删除管理员权限清单文件: {manifest_path}")
+                    show_info("已取消以管理员身份启动，应用程序将在下次启动时以普通权限运行")
+                else:
+                    log.info("清单文件不存在，无需删除")
+                    show_info("已取消以管理员身份启动")
+                
+        except Exception as e:
+            log.error(f"设置管理员启动失败: {str(e)}")
+            show_error(f"设置管理员启动失败: {str(e)}")
 
 class PrioritySettingItem(SettingItem):
     def __init__(self, parent=None):
@@ -462,6 +665,24 @@ class SettingsPage(QWidget):
             False
         )
         system_card.add_setting_item(self.autostart_setting)
+        
+        # 添加开机最小化启动设置
+        self.start_minimized_setting = CheckboxSettingItem(
+            "开机时最小化启动", 
+            "system", 
+            "start_minimized", 
+            False
+        )
+        system_card.add_setting_item(self.start_minimized_setting)
+        
+        # 添加管理员启动设置
+        self.admin_setting = CheckboxSettingItem(
+            "以管理员身份启动", 
+            "system", 
+            "run_as_admin", 
+            False
+        )
+        system_card.add_setting_item(self.admin_setting)
         
         # 添加进程优先级设置
         self.priority_setting = PrioritySettingItem()

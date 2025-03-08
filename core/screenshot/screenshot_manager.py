@@ -112,13 +112,6 @@ class ScreenshotManager(QObject):
     def _take_region_screenshot(self):
         """区域截图"""
         try:
-            # 先截取全屏作为背景
-            screen_pixmap = self._grab_full_screen()
-            if not screen_pixmap:
-                log.error("获取全屏截图失败")
-                self._reset_screenshot_state()
-                return
-                
             # 创建截图窗口
             if self.screenshot_window is None:
                 from core.screenshot.screenshot_window import ScreenshotWindow
@@ -128,8 +121,11 @@ class ScreenshotManager(QObject):
                 # 连接关闭信号，确保状态重置
                 self.screenshot_window.closed.connect(self._reset_screenshot_state)
             
-            # 配置并显示截图窗口，直接调用不使用QTimer
+            # 配置并显示截图窗口
             self.screenshot_window.grab_screen()
+            
+            # 设置检查定时器，防止卡住
+            QTimer.singleShot(10000, self._check_screenshot_progress)
             
         except Exception as e:
             log.error(f"区域截图失败: {str(e)}")

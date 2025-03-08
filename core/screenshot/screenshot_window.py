@@ -1,9 +1,11 @@
 from PySide6.QtWidgets import (QWidget, QApplication, QLabel, QPushButton, 
                              QHBoxLayout, QVBoxLayout, QRubberBand, QToolBar,
                              QSpinBox, QFontDialog, QColorDialog)
-from PySide6.QtCore import Qt, QRect, QPoint, QSize, Signal, QTimer, QMetaObject, Slot
+from PySide6.QtCore import (Qt, QRect, QPoint, QSize, Signal, QTimer, 
+                          QMetaObject, Slot, QEvent)
 from PySide6.QtGui import (QColor, QPainter, QPixmap, QScreen, QImage, 
-                          QPen, QCursor, QIcon, QKeySequence, QFont, QGuiApplication)
+                          QPen, QCursor, QIcon, QKeySequence, QFont, 
+                          QGuiApplication, QMouseEvent)
 from core.log.log_manager import log
 from core.utils.notif import show_info, show_error, Notification, NotificationType
 from core.utils.config_manager import config_manager
@@ -23,7 +25,8 @@ class ScreenshotWindow(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowState(Qt.WindowFullScreen)
         
         # 初始化属性
@@ -79,6 +82,18 @@ class ScreenshotWindow(QWidget):
         )
         self.wait_label.hide()
         
+        # 创建提示标签
+        self.tip_label = QLabel("按住Alt键并点击可选择窗口 | 方向键微调选区 | Enter确认 | Esc取消", self)
+        self.tip_label.setStyleSheet("""
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+        """)
+        self.tip_label.adjustSize()
+        self.tip_label.hide()  # 初始隐藏
+        
     def grab_screen(self):
         try:
             # 设置窗口大小和属性
@@ -97,14 +112,19 @@ class ScreenshotWindow(QWidget):
             )
             self.wait_label.show()
             
-            # 显示窗口
-            self.show()
-            self.activateWindow()  # 确保窗口激活
+            # 设置提示标签位置
+            self.tip_label.move(
+                (self.width() - self.tip_label.width()) // 2,
+                self.height() - self.tip_label.height() - 20
+            )
+            
+            # 先隐藏窗口，获取截图后再显示
+            self.hide()
             
             # 使用信号在主线程中启动截图线程
             QMetaObject.invokeMethod(self, "_start_grab_thread", Qt.QueuedConnection)
             
-            log.info("区域截图窗口已显示，等待截图...")
+            log.info("区域截图窗口准备中，等待截图...")
         except Exception as e:
             log.error(f"截取屏幕失败: {str(e)}")
             
@@ -130,8 +150,12 @@ class ScreenshotWindow(QWidget):
             # 隐藏等待提示
             self.wait_label.hide()
             
-            # 激活窗口
-            self.activateWindow()
+            # 显示提示标签
+            self.tip_label.show()
+            
+            # 显示窗口
+            self.show()
+            self.activateWindow()  # 确保窗口激活
             self.raise_()
             
             # 更新界面
@@ -149,11 +173,11 @@ class ScreenshotWindow(QWidget):
                 
             painter = QPainter(self)
             
-            # 绘制半透明背景
+            # 绘制原始截图
             painter.drawPixmap(0, 0, self.original_pixmap)
             
-            # 绘制半透明遮罩
-            painter.fillRect(self.rect(), QColor(0, 0, 0, 100))
+            # 绘制半透明遮罩，降低透明度以便更清晰地看到背景
+            painter.fillRect(self.rect(), QColor(0, 0, 0, 30))  # 进一步降低透明度从40到30
             
             # 如果有选区，则显示选区内容
             if self.is_drawing and self.begin != self.end:
@@ -164,8 +188,56 @@ class ScreenshotWindow(QWidget):
                 pen = QPen(QColor(0, 174, 255), 2)
                 painter.setPen(pen)
                 painter.drawRect(selection_rect)
+            
+            # 检测并高亮鼠标下方的窗口
+            if not self.is_drawing and hasattr(self, 'current_mouse_pos'):
+                self.highlight_window_under_cursor(painter)
         except Exception as e:
             log.error(f"绘制事件处理失败: {str(e)}")
+            
+    def highlight_window_under_cursor(self, painter):
+        """高亮鼠标下方的窗口"""
+        try:
+            # 获取鼠标位置
+            cursor_pos = self.mapToGlobal(self.current_mouse_pos)
+            
+            # 获取鼠标下方的窗口句柄
+            hwnd = win32gui.WindowFromPoint((cursor_pos.x(), cursor_pos.y()))
+            
+            if hwnd and hwnd != 0:
+                # 获取窗口矩形
+                try:
+                    left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+                    window_rect = QRect(
+                        left, top, 
+                        right - left, 
+                        bottom - top
+                    )
+                    
+                    # 转换为相对于截图窗口的坐标
+                    window_rect = QRect(
+                        window_rect.x(), 
+                        window_rect.y(),
+                        window_rect.width(), 
+                        window_rect.height()
+                    )
+                    
+                    # 绘制窗口高亮
+                    painter.setPen(QPen(QColor(0, 174, 255), 2, Qt.DashLine))
+                    painter.drawRect(window_rect)
+                    
+                    # 显示窗口信息
+                    window_title = win32gui.GetWindowText(hwnd)
+                    if window_title:
+                        info_rect = QRect(window_rect.x(), window_rect.y() - 25, 
+                                         min(300, window_rect.width()), 20)
+                        painter.fillRect(info_rect, QColor(0, 174, 255, 180))
+                        painter.setPen(Qt.white)
+                        painter.drawText(info_rect, Qt.AlignCenter, window_title[:40])
+                except Exception as e:
+                    log.error(f"获取窗口矩形失败: {str(e)}")
+        except Exception as e:
+            log.error(f"高亮窗口失败: {str(e)}")
 
     def update_size_label(self, rect):
         try:
@@ -227,42 +299,104 @@ class ScreenshotWindow(QWidget):
                     self.editor.mousePressEvent(event)
                 return
                 
-            # 开始选择区域
-            self.begin = event.pos()
-            self.end = self.begin
-            self.is_drawing = True
-            self.rubber_band.setGeometry(QRect(self.begin, self.begin))
-            self.rubber_band.show()
-            self.update_size_label(QRect(self.begin, self.begin))
-            self.size_label.show()
-            
-            # 隐藏工具栏
-            self.toolbar.hide()
-            
-            # 更新显示
-            self.update()
-            
+            if event.button() == Qt.LeftButton:
+                # 检查是否按下了Alt键 - 用于窗口选择模式
+                modifiers = QApplication.keyboardModifiers()
+                if modifiers == Qt.AltModifier:
+                    self.select_window_under_cursor(event.pos())
+                    return
+                
+                # 开始绘制选区
+                self.is_drawing = True
+                self.begin = event.pos()
+                self.end = event.pos()
+                
+                # 创建橡皮筋选择框
+                self.rubber_band.setGeometry(QRect(self.begin, self.begin))
+                self.rubber_band.show()
+                
+                # 显示尺寸标签
+                self.update_size_label(QRect(self.begin, self.begin))
+                self.size_label.show()
+                
+                # 隐藏工具栏
+                self.toolbar.hide()
+                
+                # 更新界面
+                self.update()
         except Exception as e:
             log.error(f"鼠标按下事件处理失败: {str(e)}")
             
+    def select_window_under_cursor(self, pos):
+        """选择鼠标下方的窗口"""
+        try:
+            # 获取鼠标位置
+            cursor_pos = self.mapToGlobal(pos)
+            
+            # 获取鼠标下方的窗口句柄
+            hwnd = win32gui.WindowFromPoint((cursor_pos.x(), cursor_pos.y()))
+            
+            if hwnd and hwnd != 0:
+                # 获取窗口矩形
+                try:
+                    left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+                    
+                    # 创建选区
+                    self.is_drawing = True
+                    self.begin = self.mapFromGlobal(QPoint(left, top))
+                    self.end = self.mapFromGlobal(QPoint(right, bottom))
+                    
+                    # 设置橡皮筋选择框
+                    selection_rect = self.get_selection_rect()
+                    self.rubber_band.setGeometry(selection_rect)
+                    self.rubber_band.show()
+                    
+                    # 更新选区大小标签
+                    self.update_size_label(selection_rect)
+                    
+                    # 更新界面
+                    self.update()
+                    
+                    # 自动进入编辑模式
+                    self.mouseReleaseEvent(QMouseEvent(
+                        QEvent.MouseButtonRelease,
+                        self.end,
+                        Qt.LeftButton,
+                        Qt.LeftButton,
+                        Qt.NoModifier
+                    ))
+                except Exception as e:
+                    log.error(f"获取窗口矩形失败: {str(e)}")
+        except Exception as e:
+            log.error(f"选择窗口失败: {str(e)}")
+
     def mouseMoveEvent(self, event):
         try:
+            # 保存当前鼠标位置用于窗口检测
+            self.current_mouse_pos = event.pos()
+            
             if self.edit_mode:
                 # 如果在编辑模式，传递给编辑器
                 if self.editor:
                     self.editor.mouseMoveEvent(event)
                 return
-                
+            
             if self.is_drawing:
-                # 更新选择区域
+                # 更新选区终点
                 self.end = event.pos()
+                
+                # 更新选择区域
                 selection_rect = self.get_selection_rect()
                 self.rubber_band.setGeometry(selection_rect)
+                
+                # 更新选区大小标签
                 self.update_size_label(selection_rect)
                 
-                # 更新显示
+                # 更新界面
                 self.update()
-                
+            else:
+                # 触发重绘以更新窗口高亮
+                self.update()
         except Exception as e:
             log.error(f"鼠标移动事件处理失败: {str(e)}")
             
@@ -300,21 +434,73 @@ class ScreenshotWindow(QWidget):
 
     def keyPressEvent(self, event):
         try:
-            # ESC键退出
+            # 处理ESC键 - 关闭窗口
             if event.key() == Qt.Key_Escape:
                 if self.edit_mode:
                     self.exit_edit_mode()
                 else:
                     self.close()
-                    
-            # 回车键确认截图
-            elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                return
+                
+            # 处理Alt键 - 进入窗口选择模式
+            if event.key() == Qt.Key_Alt:
+                # 更改鼠标样式，提示用户可以选择窗口
+                self.setCursor(Qt.PointingHandCursor)
+                # 更新界面以显示窗口高亮
+                self.update()
+                return
+                
+            # 处理Enter键 - 确认选择
+            if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
                 if self.edit_mode:
                     self.finish_edit()
                 else:
-                    self.capture_current_selection()
+                    if self.is_drawing and self.begin != self.end:
+                        self.capture_current_selection()
+                return
+                
+            # 处理方向键 - 微调选区
+            if self.is_drawing and not self.edit_mode:
+                self.adjust_selection_with_arrow_keys(event)
+                
         except Exception as e:
-            log.error(f"键盘事件处理失败: {str(e)}")
+            log.error(f"按键事件处理失败: {str(e)}")
+            
+    def keyReleaseEvent(self, event):
+        try:
+            # 处理Alt键释放 - 退出窗口选择模式
+            if event.key() == Qt.Key_Alt:
+                # 恢复鼠标样式
+                self.setCursor(Qt.CrossCursor)
+                # 更新界面
+                self.update()
+                return
+        except Exception as e:
+            log.error(f"按键释放事件处理失败: {str(e)}")
+            
+    def adjust_selection_with_arrow_keys(self, event):
+        """使用方向键微调选区"""
+        try:
+            step = 1
+            if QApplication.keyboardModifiers() & Qt.ShiftModifier:
+                step = 10
+                
+            if event.key() == Qt.Key_Left:
+                self.end.setX(self.end.x() - step)
+            elif event.key() == Qt.Key_Right:
+                self.end.setX(self.end.x() + step)
+            elif event.key() == Qt.Key_Up:
+                self.end.setY(self.end.y() - step)
+            elif event.key() == Qt.Key_Down:
+                self.end.setY(self.end.y() + step)
+                
+            # 更新选区
+            selection_rect = self.get_selection_rect()
+            self.rubber_band.setGeometry(selection_rect)
+            self.update_size_label(selection_rect)
+            self.update()
+        except Exception as e:
+            log.error(f"调整选区失败: {str(e)}")
 
     def capture_current_selection(self):
         try:

@@ -10,7 +10,6 @@ class WindowManager:
     
     @staticmethod
     def init():
-        """初始化窗口管理器"""
         try:
             # 注册全局快捷键
             screenshot_manager.register_global_hotkeys()
@@ -20,7 +19,6 @@ class WindowManager:
     
     @staticmethod
     def cleanup():
-        """清理窗口管理器"""
         try:
             # 注销全局快捷键
             screenshot_manager.unregister_global_hotkeys()
@@ -30,7 +28,6 @@ class WindowManager:
     
     @staticmethod
     def handle_close_event(window, event):
-        """处理窗口关闭事件"""
         # 检查是否要最小化到托盘
         minimize_to_tray = config_manager.get_config('system', 'minimize_to_tray', True)
         
@@ -84,7 +81,6 @@ class WindowManager:
 
     @staticmethod
     def finish_close(window):
-        """完成窗口关闭流程"""
         try:
             # 强制清理所有页面的引用
             stacked_widget = window.pages_manager.get_stacked_widget()
@@ -134,7 +130,6 @@ class WindowManager:
             
     @staticmethod
     def _create_tray_icon(window):
-        """创建系统托盘图标"""
         try:
             # 创建托盘图标
             tray_icon = QSystemTrayIcon(window)
@@ -209,16 +204,17 @@ class WindowManager:
     
     @staticmethod
     def _show_main_window(window):
-        """显示主窗口"""
         window.showNormal()
         window.activateWindow()
         log.info("从托盘恢复主窗口")
     
     @staticmethod
     def _exit_application(window):
-        """完全退出应用程序"""
         try:
             log.info("从托盘菜单退出应用程序")
+            
+            # 设置强制退出标志
+            window._force_quit = True
             
             # 禁用最小化到托盘
             window._closing = True
@@ -228,30 +224,29 @@ class WindowManager:
                 WindowManager._tray_icon.hide()
                 WindowManager._tray_icon = None
             
-            # 清理截图管理器
-            screenshot_manager.unregister_global_hotkeys()
+            # 清理窗口管理器
+            WindowManager.cleanup()
             
             # 关闭主窗口
             window.close()
             
-            # 确保应用退出
+            # 直接退出应用程序
             QApplication.quit()
             
         except Exception as e:
-            log.error(f"退出应用程序失败: {str(e)}")
+            log.error(f"从托盘菜单退出应用程序失败: {str(e)}")
             # 强制退出
-            QApplication.exit(1)
+            import sys
+            sys.exit(0)
     
     @staticmethod
     def _on_tray_activated(window, reason):
-        """托盘图标被点击的处理"""
         # 单击或双击显示主窗口
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
             WindowManager._show_main_window(window)
     
     @staticmethod
     def _trigger_screenshot(window, mode):
-        """触发截图功能"""
         try:
             log.info(f"从托盘菜单触发{mode}截图")
             # 调用截图管理器进行截图

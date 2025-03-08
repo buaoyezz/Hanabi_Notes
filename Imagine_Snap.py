@@ -2,7 +2,7 @@
 入口程序
 '''
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSystemTrayIcon
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import QIcon, QWindow
 from core.utils.initialization_manager import InitializationManager
@@ -11,12 +11,14 @@ from core.utils.notif import Notification, NotificationType
 from core.ui.title_bar import TitleBar
 from core.window.window_manager import WindowManager
 from core.utils.resource_manager import ResourceManager
+from core.utils.config_manager import ConfigManager
 import sys
 import os
 import ctypes
 import json
 import win32gui
 import win32con
+import argparse
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -117,9 +119,15 @@ class MainWindow(QMainWindow):
         self._notifications = []
 
     def closeEvent(self, event):
+        # 如果是从托盘菜单退出，直接接受关闭事件
+        if hasattr(self, '_force_quit') and self._force_quit:
+            event.accept()
+            return
+            
         WindowManager.handle_close_event(self, event)
         if event.isAccepted():
             WindowManager.cleanup()  # 清理窗口管理器（注销快捷键）
+            
 
     def _finish_close(self):
         WindowManager.finish_close(self)
@@ -142,17 +150,66 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     try:
+        # 检查是否需要管理员权限
+        config_manager = ConfigManager()
+        run_as_admin = config_manager.get_config('system', 'run_as_admin', False)
+        
+        # 如果需要管理员权限但当前不是管理员权限运行，则重新以管理员身份启动
+        if run_as_admin and not ctypes.windll.shell32.IsUserAnAdmin():
+            import sys
+            import subprocess
+            
+            # 构建命令行参数
+            args = []
+            for arg in sys.argv[1:]:
+                args.append(arg)
+                
+            # 以管理员身份重新启动程序
+            ctypes.windll.shell32.ShellExecuteW(
+                None,                   # 父窗口句柄
+                "runas",                # 操作
+                sys.executable,         # 可执行文件
+                " ".join(args),         # 参数
+                None,                   # 工作目录
+                1                       # 显示方式
+            )
+            
+            # 退出当前进程
+            sys.exit(0)
+        
+        # 解析命令行参数
+        parser = argparse.ArgumentParser(description='Imagine Snap 截图工具')
+        parser.add_argument('--minimized', action='store_true', help='最小化启动到系统托盘')
+        args = parser.parse_args()
+        
         app = InitializationManager.init_application()
         window = MainWindow()
-        window.show()
-        log.info("Imagine Snap 已经启动！")
         
-        # 显示欢迎通知
-        window.show_notification(
-            text="欢迎使用 Imagine Snap",
-            type=NotificationType.TIPS,
-            duration=3000
-        )
+        # 检查是否需要最小化启动
+        start_minimized = args.minimized or config_manager.get_config('system', 'start_minimized', False)
+        
+        if start_minimized:
+            # 创建托盘图标
+            WindowManager._create_tray_icon(window)
+            # 显示托盘通知
+            if WindowManager._tray_icon:
+                WindowManager._tray_icon.showMessage(
+                    "Imagine Snap",
+                    "应用程序已最小化启动到系统托盘",
+                    QSystemTrayIcon.Information,
+                    2000
+                )
+            log.info("Imagine Snap 已最小化启动到系统托盘")
+        else:
+            window.show()
+            log.info("Imagine Snap 已经启动！")
+            
+            # 显示欢迎通知
+            window.show_notification(
+                text="欢迎使用 Imagine Snap",
+                type=NotificationType.TIPS,
+                duration=3000
+            )
         
         exit_code = app.exec()
         window._finish_close()
