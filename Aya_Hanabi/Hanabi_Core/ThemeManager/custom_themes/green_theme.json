@@ -1,0 +1,56 @@
+{
+  "name": "green_theme",
+  "display_name": "森林绿主题",
+  "window": {
+    "background": "#1a2e25",
+    "border": "#2a3c33",
+    "radius": "10px"
+  },
+  "title_bar": {
+    "background": "#1a2e25",
+    "text_color": "#e0efe8",
+    "icon_bg": "#2a3c33",
+    "icon_color": "#6abf7c"
+  },
+  "editor": {
+    "background": "#1a2e25",
+    "text_color": "#e0efe8",
+    "selection_color": "#4a8c64",
+    "cursor_color": "#e0efe8",
+    "line_height": "1.5"
+  },
+  "scrollbar": {
+    "background": "transparent",
+    "handle_color": "rgba(106, 191, 124, 0.3)",
+    "handle_hover_color": "rgba(106, 191, 124, 0.5)",
+    "width": "6px",
+    "radius": "3px"
+  },
+  "status_bar": {
+    "background": "#152118",
+    "text_color": "#e0efe8",
+    "icon_color": "rgba(255, 255, 255, 0.7)",
+    "active_icon_color": "#6abf7c"
+  },
+  "sidebar": {
+    "background": "#1d3328",
+    "text_color": "#e0efe8",
+    "active_tab_bg": "#2a3c33",
+    "hover_tab_bg": "rgba(255, 255, 255, 0.1)",
+    "icon_color": "rgba(255, 255, 255, 0.7)"
+  },
+  "preview": {
+    "background": "#1a2e25",
+    "text_color": "#e0efe8",
+    "heading_color": "#ffffff",
+    "link_color": "#6abf7c",
+    "code_bg": "rgba(42, 60, 51, 0.4)",
+    "blockquote_color": "#a7c2b3",
+    "blockquote_border": "#2a3c33",
+    "table_border": "#2a3c33"
+  },
+  "highlight": {
+    "line_color": "rgba(106, 191, 124, 0.3)",
+    "flash_color": "rgba(106, 191, 124, 0.5)"
+  }
+} 
