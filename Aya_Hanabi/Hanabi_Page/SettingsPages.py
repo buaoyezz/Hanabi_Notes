@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QFileDialog, QMessageBox)
 from PySide6.QtGui import QFont, QIcon, QPixmap, QImage, QColor, QFocusEvent
 from PySide6.QtWidgets import QApplication
+from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
 
 # 自定义无焦点组件基类
 class NoFocusWidget:
@@ -497,11 +498,11 @@ class SettingsDialog(QDialog):
                 self.accept()
                 mainWindow.showThemeSettings()
             else:
-                from PySide6.QtWidgets import QMessageBox
-                QMessageBox.information(self, "提示", "无法打开主题设置")
+                from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
+                information(self, "提示", "无法打开主题设置")
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "错误", f"打开主题设置时出错: {str(e)}")
+            from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
+            warning(self, "错误", f"打开主题设置时出错: {str(e)}")
     
     def openFontDialog(self):
         try:
@@ -521,8 +522,8 @@ class SettingsDialog(QDialog):
             
             fontDialog.exec()
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "错误", f"打开字体对话框时出错: {str(e)}")
+            from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
+            warning(self, "错误", f"打开字体对话框时出错: {str(e)}")
 
     def loadGeneralSettings(self):
         startupSettings = self.settings["general"]["startup"]
@@ -716,8 +717,8 @@ class SettingsDialog(QDialog):
                 
         except Exception as e:
             print(f"保存设置时出错: {str(e)}")
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "保存失败", f"保存设置时出错: {str(e)}")
+            from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
+            warning(self, "保存失败", f"保存设置时出错: {str(e)}")
     
     def getSettingsDir(self):
         app_data_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
@@ -818,33 +819,33 @@ class SettingsDialog(QDialog):
     def applyStyle(self):
         self.setStyleSheet("""
             QDialog {
-                background-color: #1e2128;
+                background-color: #f5f5f5;
                 border-radius: 10px;
             }
             
             #titleBar {
-                background-color: #252932;
+                background-color: #e8e8e8;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
             }
             
             #titleLabel {
-                color: #e0e5ec;
+                color: #333333;
             }
             
             #contentWidget {
-                background-color: #1e2128;
+                background-color: #f5f5f5;
             }
             
             #navWidget {
-                background-color: #252932;
+                background-color: #e8e8e8;
                 border-top-right-radius: 0px;
                 border-bottom-left-radius: 10px;
             }
             
             #navListWidget {
                 background-color: transparent;
-                color: #e0e5ec;
+                color: #333333;
                 font-size: 14px;
             }
             
@@ -854,17 +855,17 @@ class SettingsDialog(QDialog):
             }
             
             #navListWidget::item:selected {
-                background-color: #2f3440;
+                background-color: #d0d0d0;
             }
             
             #navListWidget::item:hover:!selected {
-                background-color: rgba(255, 255, 255, 0.1);
+                background-color: rgba(0, 0, 0, 0.05);
             }
             
             #rightWidget {
-                background-color: #1e2128;
+                background-color: #f5f5f5;
                 border-bottom-right-radius: 10px;
-                color: white;
+                color: #333333;
             }
             
             #contentStack {
@@ -873,68 +874,68 @@ class SettingsDialog(QDialog):
             }
             
             QLabel {
-                color: #e0e5ec;
+                color: #333333;
             }
             
             QPushButton {
-                background-color: #2f3440;
-                color: #e0e5ec;
+                background-color: #e0e0e0;
+                color: #333333;
                 border: none;
                 padding: 8px 16px;
                 border-radius: 5px;
             }
             
             QPushButton:hover {
-                background-color: #3a3f4b;
+                background-color: #d0d0d0;
             }
             
             #saveButton {
-                background-color: #6b9fff;
-                color: #e0e5ec;
+                background-color: #0066cc;
+                color: white;
             }
             
             #saveButton:hover {
-                background-color: #7eabff;
+                background-color: #0055bb;
             }
             
             QCheckBox {
-                color: #e0e5ec;
+                color: #333333;
             }
             
             QCheckBox::indicator {
                 width: 18px;
                 height: 18px;
                 border-radius: 3px;
-                border: 1px solid #404656;
-                background: #2f3440;
+                border: 1px solid #b0b0b0;
+                background: #ffffff;
             }
             
             QCheckBox::indicator:checked {
-                background: #6b9fff;
-                border: 1px solid #6b9fff;
+                background: #0066cc;
+                border: 1px solid #0066cc;
             }
             
             QComboBox, QSpinBox {
-                background-color: #2f3440;
-                color: #e0e5ec;
-                border: none;
+                background-color: #ffffff;
+                color: #333333;
+                border: 1px solid #d0d0d0;
                 border-radius: 5px;
                 padding: 5px;
             }
             
             QLineEdit {
-                background-color: #2f3440;
-                color: #e0e5ec;
-                border: none;
+                background-color: #ffffff;
+                color: #333333;
+                border: 1px solid #d0d0d0;
                 border-radius: 5px;
                 padding: 5px;
             }
             
             QGroupBox {
-                border: 1px solid #2f3440;
+                border: 1px solid #d0d0d0;
                 border-radius: 5px;
                 margin-top: 1.5ex;
-                color: #e0e5ec;
+                color: #333333;
                 font-weight: bold;
             }
             
@@ -956,35 +957,35 @@ class SettingsDialog(QDialog):
             }
             
             #logoLabel {
-                color: #e0e5ec;
+                color: #333333;
                 font-size: 24px;
             }
             
             #versionLabel {
-                color: #a0a0a0;
+                color: #666666;
                 font-size: 12px;
             }
             
             #descLabel {
-                color: #e0e5ec;
+                color: #333333;
                 font-size: 14px;
                 margin: 10px;
             }
             
             #copyrightLabel {
-                color: #a0a0a0;
+                color: #666666;
                 font-size: 12px;
             }
             
             #linkButton {
                 background-color: transparent;
-                color: #6b9fff;
+                color: #0066cc;
                 text-decoration: underline;
                 border: none;
             }
             
             #linkButton:hover {
-                color: #7eabff;
+                color: #0055bb;
             }
         """)
 
@@ -1249,11 +1250,11 @@ class ThemeSettingsDialog(QDialog):
             bg_color = "#f5f5f5"
             title_bar_color = "#f5f5f5"
             icon_bg_color = "#e0e0e0"
-            icon_color = "#2196f3"
+            icon_color = "#333333"
             text_color = "#333333"
             editor_bg = "#ffffff"
             editor_text = "#333333"
-            border_color = "#2196f3"
+            border_color = "#666666"
             
             card.setStyleSheet(f"""
                 #themeCard_light {{
@@ -1546,7 +1547,7 @@ class ThemeSettingsDialog(QDialog):
                 
             # 检查基本结构
             if not isinstance(theme_data, dict) or "name" not in theme_data:
-                QMessageBox.warning(self, "导入错误", "无效的主题文件格式")
+                warning(self, "导入错误", "无效的主题文件格式")
                 return
                 
             # 获取主题名称
@@ -1555,15 +1556,10 @@ class ThemeSettingsDialog(QDialog):
             
             # 检查是否已存在同名主题
             if self.themeManager and theme_name in [theme[0] for theme in self.themeManager.get_all_themes()]:
-                reply = QMessageBox.question(
-                    self,
-                    "主题已存在",
-                    f"主题 '{display_name}' 已存在。是否替换?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No
-                )
+                reply = question(
+                    self, "主题已存在", f"主题 '{display_name}' 已存在。是否替换?", HanabiMessageBox.YesNo)
                 
-                if reply != QMessageBox.Yes:
+                if reply != HanabiMessageBox.Yes_Result:
                     return
             
             # 导入主题
@@ -1582,11 +1578,11 @@ class ThemeSettingsDialog(QDialog):
                 # 刷新主题卡片显示
                 self.refreshThemeCards()
                 
-                QMessageBox.information(self, "导入成功", f"主题 '{display_name}' 已成功导入")
+                information(self, "导入成功", f"主题 '{display_name}' 已成功导入")
             else:
-                QMessageBox.warning(self, "导入失败", "主题管理器不可用")
+                warning(self, "导入失败", "主题管理器不可用")
         except Exception as e:
-            QMessageBox.critical(self, "导入错误", f"导入主题时出错: {str(e)}")
+            critical(self, "导入错误", f"导入主题时出错: {str(e)}")
             
     def refreshThemeCards(self):
         if not self.themeManager:
@@ -1630,166 +1626,176 @@ class ThemeSettingsDialog(QDialog):
             print(f"刷新主题卡片时出错: {str(e)}")
     
     def applyStyle(self):
-        # 基础颜色
-        bg_color = "#1e2128"
-        text_color = "#e0e0e0"
-        input_bg = "#252932"
-        border_color = "#2a2e36"
-        button_bg = "#3b4048"
-        button_hover = "#494e5a"
-        button_pressed = "#5a6175"
-        title_bar_bg = "#1e2128"
-        content_bg = "#1e2128"
-        nav_bg = "#252932"
-        card_bg = "#252932"
-        
-        # 如果有主题管理器并且有当前主题，使用它的颜色
-        if hasattr(self, 'themeManager') and self.themeManager and hasattr(self.themeManager, 'current_theme'):
-            theme = self.themeManager.current_theme
-            if theme:
-                bg_color = theme.get("window.background", bg_color)
-                text_color = theme.get("editor.text_color", text_color)
-                input_bg = theme.get("sidebar.background", input_bg)
-                border_color = theme.get("window.border", border_color)
-                button_bg = theme.get("sidebar.active_tab_bg", button_bg)
-                button_hover = theme.get("sidebar.hover_tab_bg", button_hover)
-                title_bar_bg = theme.get("title_bar.background", title_bar_bg)
-                content_bg = bg_color
-                nav_bg = input_bg
-                card_bg = input_bg
-        
-        self.setStyleSheet(f"""
-            QDialog {{
-            background-color: {bg_color};
-            border-radius: 10px;
-            }}
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f5f5f5;
+                border-radius: 10px;
+            }
             
-            #titleBar {{
-            background-color: {title_bar_bg};
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-            }}
+            #titleBar {
+                background-color: #e8e8e8;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+            }
             
-            #titleLabel {{
-            color: {text_color};
-            }}
+            #titleLabel {
+                color: #333333;
+            }
             
-            #contentWidget {{
-            background-color: {content_bg};
-            }}
+            #contentWidget {
+                background-color: #f5f5f5;
+            }
             
-            #navWidget {{
-            background-color: {nav_bg};
-            border-top-right-radius: 0px;
-            border-bottom-left-radius: 10px;
-            }}
+            #navWidget {
+                background-color: #e8e8e8;
+                border-top-right-radius: 0px;
+                border-bottom-left-radius: 10px;
+            }
             
-            #navListWidget {{
-            background-color: transparent;
-            color: {text_color};
-            font-size: 14px;
-            }}
+            #navListWidget {
+                background-color: transparent;
+                color: #333333;
+                font-size: 14px;
+            }
             
-            #navListWidget::item {{
-            padding: 10px;
-            border-radius: 5px;
-            }}
+            #navListWidget::item {
+                padding: 10px;
+                border-radius: 5px;
+            }
             
-            #navListWidget::item:selected {{
-            background-color: {input_bg};
-            }}
+            #navListWidget::item:selected {
+                background-color: #d0d0d0;
+            }
             
-            #navListWidget::item:hover:!selected {{
-            background-color: rgba(255, 255, 255, 0.1);
-            }}
+            #navListWidget::item:hover:!selected {
+                background-color: rgba(0, 0, 0, 0.05);
+            }
             
-            #rightWidget {{
-            background-color: {content_bg};
-            border-bottom-right-radius: 10px;
-            color: {text_color};
-            }}
+            #rightWidget {
+                background-color: #f5f5f5;
+                border-bottom-right-radius: 10px;
+                color: #333333;
+            }
             
-            #contentStack {{
-            background-color: transparent;
-            border: none;
-            }}
+            #contentStack {
+                background-color: transparent;
+                border: none;
+            }
             
-            QLabel {{
-            color: {text_color};
-            }}
+            QLabel {
+                color: #333333;
+            }
             
-            QPushButton {{
-            background-color: {button_bg};
-            color: {text_color};
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            }}
+            QPushButton {
+                background-color: #e0e0e0;
+                color: #333333;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 5px;
+            }
             
-            QPushButton:hover {{
-            background-color: {button_hover};
-            }}
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
             
-            #saveButton {{
-            background-color: {button_bg};
-            color: {text_color};
-            }}
+            #saveButton {
+                background-color: #0066cc;
+                color: white;
+            }
             
-            #saveButton:hover {{
-            background-color: {button_hover};
-            }}
+            #saveButton:hover {
+                background-color: #0055bb;
+            }
             
-            #themeScrollArea {{
-            background-color: transparent;
-            border: none;
-            }}
+            QCheckBox {
+                color: #333333;
+            }
             
-            QScrollBar:vertical {{
-            background: transparent;
-            width: 6px;
-            margin: 0px;
-            border-radius: 3px;
-            }}
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 3px;
+                border: 1px solid #b0b0b0;
+                background: #ffffff;
+            }
             
-            QScrollBar::handle:vertical {{
-            background-color: rgba(255, 255, 255, 0.3);
-            min-height: 30px;
-            border-radius: 3px;
-            }}
+            QCheckBox::indicator:checked {
+                background: #0066cc;
+                border: 1px solid #0066cc;
+            }
             
-            QScrollBar::handle:vertical:hover {{
-            background-color: rgba(255, 255, 255, 0.5);
-            }}
+            QComboBox, QSpinBox {
+                background-color: #ffffff;
+                color: #333333;
+                border: 1px solid #d0d0d0;
+                border-radius: 5px;
+                padding: 5px;
+            }
             
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-            height: 0px;
-            }}
+            QLineEdit {
+                background-color: #ffffff;
+                color: #333333;
+                border: 1px solid #d0d0d0;
+                border-radius: 5px;
+                padding: 5px;
+            }
             
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
-            background: none;
-            }}
+            QGroupBox {
+                border: 1px solid #d0d0d0;
+                border-radius: 5px;
+                margin-top: 1.5ex;
+                color: #333333;
+                font-weight: bold;
+            }
             
-            #importButton {{
-            background-color: {button_bg};
-            color: {text_color};
-            }}
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
             
-            #importButton:hover {{
-            background-color: {button_hover};
-            }}
+            #settingsGroup {
+                padding: 10px;
+            }
             
-            QCheckBox::indicator {{
-            width: 18px;
-            height: 18px;
-            border-radius: 3px;
-            border: 1px solid #404656;
-            background: #2f3440;
-            }}
+            #smallerButton, #largerButton {
+                font-size: 16px;
+                font-weight: bold;
+                padding: 0;
+            }
             
-            QCheckBox::indicator:checked {{
-            background: #6b9fff;
-            border: 1px solid #6b9fff;
-            }}
+            #logoLabel {
+                color: #333333;
+                font-size: 24px;
+            }
+            
+            #versionLabel {
+                color: #666666;
+                font-size: 12px;
+            }
+            
+            #descLabel {
+                color: #333333;
+                font-size: 14px;
+                margin: 10px;
+            }
+            
+            #copyrightLabel {
+                color: #666666;
+                font-size: 12px;
+            }
+            
+            #linkButton {
+                background-color: transparent;
+                color: #0066cc;
+                text-decoration: underline;
+                border: none;
+            }
+            
+            #linkButton:hover {
+                color: #0055bb;
+            }
         """)
 
 from PySide6.QtWidgets import QApplication

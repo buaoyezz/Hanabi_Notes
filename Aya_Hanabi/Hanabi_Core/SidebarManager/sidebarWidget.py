@@ -26,14 +26,14 @@ class ActionButton(QPushButton):
             QPushButton {
                 background-color: transparent;
                 border: none;
-                color: #e0e5ec;
+                color: #333333;
                 border-radius: 13px;
             }
             QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.1);
+                background-color: rgba(0, 0, 0, 0.1);
             }
             QPushButton:pressed {
-                background-color: rgba(255, 255, 255, 0.15);
+                background-color: rgba(0, 0, 0, 0.15);
             }
         """)
         
@@ -48,13 +48,24 @@ class ActionButton(QPushButton):
         self.hoverAnimation.leaveEvent()
     
     def updateStyle(self, hovered=False, themeManager=None):
-        icon_color = "#e0e5ec"  # 默认颜色
-        hover_bg = "rgba(255, 255, 255, 0.15)"
+        icon_color = "#333333"  # default Color
+        hover_bg = "rgba(0, 0, 0, 0.05)"  # set bg 
         normal_bg = "transparent"
         
         if themeManager and themeManager.current_theme:
-            icon_color = themeManager.current_theme.get("sidebar.icon_color", "#e0e5ec")
-            hover_bg = themeManager.current_theme.get("sidebar.hover_tab_bg", "rgba(255, 255, 255, 0.1)")
+            icon_color = themeManager.current_theme.get("sidebar.icon_color", "#333333")
+            
+            # 判断是否为暗色主题
+            is_dark_theme = False
+            if hasattr(themeManager, 'current_theme_name'):
+                is_dark_theme = themeManager.current_theme_name in ["dark", "purple_dream", "green_theme"]
+                
+            # 根据主题类型调整悬停背景透明度
+            if is_dark_theme:
+                # 暗色主题增强悬停效果，提高透明度
+                hover_bg = themeManager.current_theme.get("sidebar.hover_tab_bg", "rgba(255, 255, 255, 0.08)")
+            else:
+                hover_bg = themeManager.current_theme.get("sidebar.hover_tab_bg", "rgba(0, 0, 0, 0.05)")
             
         if hovered:
             self.setStyleSheet(f"""
@@ -65,7 +76,7 @@ class ActionButton(QPushButton):
                     border-radius: 13px;
                 }}
                 QPushButton:pressed {{
-                    background-color: rgba(255, 255, 255, 0.2);
+                    background-color: rgba(0, 0, 0, 0.15);
                 }}
             """)
         else:
@@ -80,7 +91,7 @@ class ActionButton(QPushButton):
                     background-color: {hover_bg};
                 }}
                 QPushButton:pressed {{
-                    background-color: rgba(255, 255, 255, 0.15);
+                    background-color: rgba(0, 0, 0, 0.15);
                 }}
             """)
 
@@ -111,32 +122,63 @@ class TabButton(QPushButton):
     
     def setActive(self, active):
         self.isActive = active
-        self.updateStyle()
+        # 获取主题管理器（如果可用）
+        themeManager = None
+        if self.window() and hasattr(self.window(), 'themeManager'):
+            themeManager = self.window().themeManager
+        self.updateStyle(themeManager)
     
-    def updateStyle(self):
+    def updateStyle(self, themeManager=None):
+        # 默认颜色 - 与以前保持兼容
+        active_bg = "rgba(0, 0, 0, 0.15)"
+        hover_bg = "rgba(0, 0, 0, 0.03)"
+        active_hover_bg = "rgba(0, 0, 0, 0.18)"
+        text_color = "#333333"
+        inactive_color = "rgba(0, 0, 0, 0.7)"
+        
+        # 如果提供了主题管理器，应用主题颜色
+        if themeManager and hasattr(themeManager, 'current_theme'):
+            # 判断是否为暗色主题
+            is_dark_theme = False
+            if hasattr(themeManager, 'current_theme_name'):
+                is_dark_theme = themeManager.current_theme_name in ["dark", "purple_dream", "green_theme"]
+            
+            # 根据主题调整悬停效果
+            if is_dark_theme:
+                # 增强暗色主题悬停效果
+                hover_bg = themeManager.current_theme.get("sidebar.hover_tab_bg", "rgba(255, 255, 255, 0.08)")
+                active_hover_bg = "rgba(255, 255, 255, 0.12)"
+            else:
+                hover_bg = "rgba(0, 0, 0, 0.03)"
+                active_hover_bg = "rgba(0, 0, 0, 0.18)"
+            
+            active_bg = themeManager.current_theme.get("sidebar.active_tab_bg", active_bg)
+            text_color = themeManager.current_theme.get("sidebar.text_color", text_color)
+            inactive_color = themeManager.current_theme.get("sidebar.icon_color", inactive_color)
+        
         if self.isActive:
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.15);
-                    color: white;
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {active_bg};
+                    color: {text_color};
                     border: none;
                     border-radius: 18px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(255, 255, 255, 0.2);
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {active_hover_bg};
+                }}
             """)
         else:
-            self.setStyleSheet("""
-                QPushButton {
+            self.setStyleSheet(f"""
+                QPushButton {{
                     background-color: transparent;
-                    color: rgba(255, 255, 255, 0.7);
+                    color: {inactive_color};
                     border: none;
                     border-radius: 18px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(255, 255, 255, 0.1);
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {hover_bg};
+                }}
             """)
     
     def eventFilter(self, obj, event):
@@ -196,35 +238,15 @@ class SidebarWidget(QWidget):
         self.setObjectName("sidebar")
         self.setFixedWidth(60)
         
+        # 只设置基本样式，颜色将从主题获取
         self.setStyleSheet("""
             QWidget {
-                background-color: #1a1d23;
+                background-color: transparent;
             }
             #sidebar {
-                background-color: #1a1d23;
                 border-right: none;
             }
-            #sidebarHeader {
-                background-color: #1a1d23;
-                border-bottom: 1px solid #2d2d2d;
-            }
-            #actionBar {
-                background-color: #1a1d23;
-            }
-            #tabContainer {
-                background-color: #1a1d23;
-            }
-            QScrollArea {
-                background-color: #1a1d23;
-                border: none;
-            }
-            QWidget#tabScrollAreaViewport {
-                background-color: #1a1d23;
-            }
             QToolTip {
-                background-color: #1e2128;
-                color: white;
-                border: 1px solid #3a3f4b;
                 padding: 4px;
                 border-radius: 3px;
             }
@@ -367,6 +389,10 @@ class SidebarWidget(QWidget):
         tabButton.clicked.connect(create_activate_handler(index))
         tabButton.closeRequested.connect(self.closeTab)
         
+        # 如果有主题管理器，应用样式
+        if hasattr(self.window(), 'themeManager'):
+            tabButton.updateStyle(self.window().themeManager)
+        
         self.tabButtons.append(tabButton)
         self.tabLayout.addWidget(tabButton, 0, Qt.AlignCenter)
         
@@ -476,7 +502,7 @@ class SidebarWidget(QWidget):
             # 获取侧边栏主题样式
             bg_color = themeManager.current_theme.get("sidebar.background", "#1a1d23")
             border_color = themeManager.current_theme.get("sidebar.border_color", "#2d2d2d")
-            text_color = themeManager.current_theme.get("sidebar.text_color", "#e0e5ec")
+            text_color = themeManager.current_theme.get("sidebar.text_color", "#333333")
             
             self.setStyleSheet(f"""
                 QWidget {{
@@ -528,40 +554,38 @@ class SidebarWidget(QWidget):
             for btn in self.findChildren(ActionButton):
                 btn.updateStyle(False, themeManager)
                 
-            # 更新TabButton样式
-            active_tab_bg = themeManager.current_theme.get("sidebar.active_tab_bg", "#2f3440")
-            hover_tab_bg = themeManager.current_theme.get("sidebar.hover_tab_bg", "rgba(255, 255, 255, 0.1)")
-            icon_color = themeManager.current_theme.get("sidebar.icon_color", "rgba(224, 229, 236, 0.7)")
-            
+            # 更新TabButton样式 - 传递主题管理器给每个按钮
             for btn in self.tabButtons:
-                if btn.isActive:
-                    btn.setStyleSheet(f"""
-                        QPushButton {{
-                            background-color: {active_tab_bg};
-                            color: {text_color};
-                            border: none;
-                            border-radius: 18px;
-                        }}
-                        QPushButton:hover {{
-                            background-color: {hover_tab_bg};
-                        }}
-                    """)
-                else:
-                    btn.setStyleSheet(f"""
-                        QPushButton {{
-                            background-color: transparent;
-                            color: {icon_color};
-                            border: none;
-                            border-radius: 18px;
-                        }}
-                        QPushButton:hover {{
-                            background-color: {hover_tab_bg};
-                        }}
-                    """)
+                btn.updateStyle(themeManager)
                 
         except Exception as e:
             print(f"更新侧边栏样式时出错: {e}")
             
     def closeEvent(self, event):
         self.scrollAnimation.cleanup()
-        super().closeEvent(event) 
+        super().closeEvent(event)
+
+    # 添加展开侧边栏方法
+    def expandBar(self):
+        # 如果已经有侧边栏控制器，则使用它
+        if hasattr(self, 'sidebarController') and self.sidebarController:
+            self.sidebarController.expand()
+        # 如果没有控制器但有动作管理器，则使用它
+        elif hasattr(self, 'actionManager') and self.actionManager:
+            self.actionManager.expand()
+
+    # 添加检查并收起侧边栏方法
+    def checkAndCollapseBar(self):
+        # 检查鼠标是否在侧边栏区域外
+        global_pos = QCursor.pos()
+        sidebar_rect = self.rect()
+        sidebar_global_pos = self.mapToGlobal(QPoint(0, 0))
+        sidebar_global_rect = QRect(sidebar_global_pos, self.size())
+        
+        if not sidebar_global_rect.contains(global_pos):
+            # 如果已经有侧边栏控制器，则使用它
+            if hasattr(self, 'sidebarController') and self.sidebarController:
+                self.sidebarController.collapse()
+            # 如果没有控制器但有动作管理器，则使用它
+            elif hasattr(self, 'actionManager') and self.actionManager:
+                self.actionManager.collapse() 

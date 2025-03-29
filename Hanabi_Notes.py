@@ -13,7 +13,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QPoint, Signal, QEvent, QTimer, QRect, QPropertyAnimation, QEasingCurve
 from PySide6.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, 
                               QHBoxLayout, QPushButton, QTextEdit, QPlainTextEdit, QWidget, QSplitter, QStackedWidget,
-                              QMessageBox, QScrollBar)
+                              QMessageBox, QScrollBar, QFileDialog)
 from PySide6.QtGui import QFont, QColor, QCursor, QTextCursor, QTextFormat, QSyntaxHighlighter,QTextCharFormat
 
 # 导入文件管理相关功能
@@ -22,9 +22,16 @@ from Aya_Hanabi.Hanabi_Core.FileManager import (
     close_file, change_file, AutoSave
 )
 
+# 导入自动备份管理器
+from Aya_Hanabi.Hanabi_Core.FileManager.autoBackup import AutoBackup
+
+
+from Aya_Hanabi.Hanabi_Core.UI import TitleBar, StatusBar, IconButton
+from Aya_Hanabi.Hanabi_Core.Editor import EditorManager
+from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
+
 # 添加调试日志功能
 def log_to_file(message):
-    """将调试信息写入日志文件"""
     try:
         log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
         if not os.path.exists(log_dir):
@@ -44,7 +51,7 @@ try:
     from Aya_Hanabi.Hanabi_Core.FontManager.fontManager import IconProvider, ICONS
     from Aya_Hanabi.Hanabi_Core.SidebarManager import SidebarMode
     from Aya_Hanabi.Hanabi_Core.SidebarManager.sidebarWidget import SidebarWidget
-    from Aya_Hanabi.Hanabi_Core.ThemeManager import ThemeManager
+    from Aya_Hanabi.Hanabi_Core.ThemeManager.themeManager import ThemeManager
     from Aya_Hanabi.Hanabi_Page.SettingsPages import SettingsDialog, ThemeSettingsDialog
     from Aya_Hanabi.Hanabi_HighLight import get_highlighter, detect_file_type
     try:
@@ -109,471 +116,40 @@ except ImportError as e:
                 }}
             """
 
-class IconButton(QPushButton):
-    def __init__(self, iconName, size=14, parent=None):
-        icon = IconProvider.get_icon(iconName)
-        super().__init__(icon, parent)
-        self.setFont(IconProvider.get_icon_font(size))
-        self.setCursor(Qt.PointingHandCursor)
-        self.setStyleSheet("border: none; background: transparent;")
-
-class TitleBar(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.parent = parent
-        self.setFixedHeight(40)
-        self.startPos = None
-        
-        # 初始样式将在updateStyle中设置
-        self.updateStyle()
-        
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 0, 15, 0)
-        layout.setSpacing(0)
-        
-        leftContainer = QWidget()
-        leftContainer.setObjectName("titleBarIcon")
-        leftContainer.setStyleSheet("border-top-left-radius: 10px;")
-        titleLayout = QHBoxLayout(leftContainer)
-        titleLayout.setContentsMargins(8, 0, 15, 0)
-        titleLayout.setSpacing(5)
-        titleLayout.setAlignment(Qt.AlignLeft)
-        
-        iconContainer = QWidget()
-        iconContainer.setObjectName("iconContainer")
-        iconContainer.setFixedSize(28, 28)
-        iconLayout = QHBoxLayout(iconContainer)
-        iconLayout.setContentsMargins(0, 0, 0, 0)
-        
-        self.iconLabel = QLabel("H")
-        self.iconLabel.setObjectName("iconLabel")
-        self.iconLabel.setAlignment(Qt.AlignCenter)
-        iconLayout.addWidget(self.iconLabel)
-        
-        titleLayout.addWidget(iconContainer)
-        
-        self.titleLabel = QLabel("Hanabi Notes")
-        self.titleLabel.setObjectName("titleLabel")
-        titleLayout.addWidget(self.titleLabel)
-        
-        layout.addWidget(leftContainer, 0, Qt.AlignLeft)
-        
-        iconContainer.installEventFilter(self)
-        leftContainer.installEventFilter(self)
-        
-        middleContainer = QWidget()
-        middleContainer.setObjectName("titleBarMiddle")
-        layout.addWidget(middleContainer, 1)
-        
-        buttonLayout = QHBoxLayout()
-        buttonLayout.setSpacing(18)
-        
-        rightContainer = QWidget()
-        rightContainer.setObjectName("titleBarRight")
-        rightContainer.setLayout(buttonLayout)
-        
-        self.minButton = IconButton("minimize", 16)
-        self.minButton.setObjectName("minButton")
-        self.minButton.clicked.connect(self.parent.showMinimized)
-        
-        self.maxButton = IconButton("crop_square", 16)
-        self.maxButton.setObjectName("maxButton")
-        self.maxButton.clicked.connect(self.toggleMaximize)
-        
-        self.closeButton = IconButton("close", 16)
-        self.closeButton.setObjectName("closeButton")
-        self.closeButton.clicked.connect(self.parent.close)
-        
-        buttonLayout.addWidget(self.minButton)
-        buttonLayout.addWidget(self.maxButton)
-        buttonLayout.addWidget(self.closeButton)
-        
-        layout.addWidget(rightContainer)
-        
-    def updateStyle(self):
-        """更新标题栏样式"""
-        if hasattr(self.parent, 'themeManager') and self.parent.themeManager:
-            themeManager = self.parent.themeManager
-            title_style, icon_bg_style, icon_label_style = themeManager.get_title_bar_style()
-            
-            # 获取当前主题名
-            theme_name = ""
-            if hasattr(themeManager.current_theme, 'name'):
-                theme_name = themeManager.current_theme.name
-            
-            # 应用标题栏样式但不覆盖布局相关属性
-            self.setStyleSheet(title_style)
-            
-            # 获取主题颜色
-            if themeManager.current_theme:
-                # 亮色主题特殊处理
-                if theme_name == "light":
-                    bg_color = "#f5f5f5"  # 确保亮色主题使用浅色背景
-                    text_color = "#333333"
-                    min_max_color = "rgba(0, 0, 0, 0.6)"
-                    close_color = "rgba(0, 0, 0, 0.6)"
-                    close_hover = "#e81123"
-                    min_max_hover = "rgba(0, 0, 0, 0.8)"
-                    hover_bg = "rgba(0, 0, 0, 0.05)"
-                else:
-                    bg_color = themeManager.current_theme.get("title_bar.background", "#1e2128")
-                    text_color = themeManager.current_theme.get("title_bar.text_color", "white")
-                    min_max_color = themeManager.current_theme.get("title_bar.controls_color", "rgba(255, 255, 255, 0.8)")
-                    close_color = themeManager.current_theme.get("title_bar.close_color", "rgba(255, 255, 255, 0.8)")
-                    close_hover = themeManager.current_theme.get("title_bar.close_hover", "#e81123")
-                    min_max_hover = themeManager.current_theme.get("title_bar.controls_hover", "rgba(255, 255, 255, 1.0)")
-                    hover_bg = themeManager.current_theme.get("title_bar.button_hover_bg", "rgba(255, 255, 255, 0.1)")
-            else:
-                # 默认值
-                bg_color = "#1e2128"
-                text_color = "white"
-                min_max_color = "rgba(255, 255, 255, 0.8)"
-                close_color = "rgba(255, 255, 255, 0.8)"
-                close_hover = "#e81123"
-                min_max_hover = "rgba(255, 255, 255, 1.0)"
-                hover_bg = "rgba(255, 255, 255, 0.1)"
-            
-            # 设置子控件样式
-            if hasattr(self, 'iconLabel'):
-                self.iconLabel.setStyleSheet(icon_label_style)
-            
-            if hasattr(self, 'titleLabel'):
-                self.titleLabel.setStyleSheet(f"color: {text_color}; font-size: 15px; font-weight: 500;")
-            
-            # 设置容器样式，使用直接查找而不是依赖对象名
-            iconContainer = self.findChild(QWidget, "iconContainer")
-            if iconContainer:
-                iconContainer.setStyleSheet(icon_bg_style)
-            
-            titleBarIcon = self.findChild(QWidget, "titleBarIcon")
-            if titleBarIcon:
-                titleBarIcon.setStyleSheet(f"""
-                    background-color: {bg_color}; 
-                    border-top-left-radius: 10px;
-                """)
-            
-            titleBarMiddle = self.findChild(QWidget, "titleBarMiddle")
-            if titleBarMiddle:
-                titleBarMiddle.setStyleSheet(f"background-color: {bg_color};")
-            
-            titleBarRight = self.findChild(QWidget, "titleBarRight")
-            if titleBarRight:
-                titleBarRight.setStyleSheet(f"""
-                    background-color: {bg_color}; 
-                    border-top-right-radius: 10px;
-                """)
-            
-            # 设置按钮样式
-            button_style = f"""
-                QPushButton {{
-                    color: {min_max_color}; 
-                    background-color: transparent;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 2px;
-                }}
-                QPushButton:hover {{
-                    color: {min_max_hover};
-                    background-color: {hover_bg};
-                }}
-            """
-            
-            close_button_style = f"""
-                QPushButton {{
-                    color: {close_color}; 
-                    background-color: transparent;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 2px;
-                }}
-                QPushButton:hover {{
-                    color: white;
-                    background-color: {close_hover};
-                }}
-            """
-            
-            if hasattr(self, 'minButton'):
-                self.minButton.setStyleSheet(button_style)
-                
-            if hasattr(self, 'maxButton'):
-                self.maxButton.setStyleSheet(button_style)
-                
-            if hasattr(self, 'closeButton'):
-                self.closeButton.setStyleSheet(close_button_style)
-        else:
-            # 默认样式
-            self.setStyleSheet("background-color: #1e2128; border-top-left-radius: 10px; border-top-right-radius: 10px;")
-        
-    def toggleMaximize(self):
-        if self.parent.isMaximized():
-            self.parent.showNormal()
-        else:
-            self.parent.showMaximized()
-            
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.startPos = event.globalPosition().toPoint()
-            
-    def mouseMoveEvent(self, event):
-        if self.startPos and not self.parent.isMaximized():
-            delta = event.globalPosition().toPoint() - self.startPos
-            self.parent.move(self.parent.x() + delta.x(), self.parent.y() + delta.y())
-            self.startPos = event.globalPosition().toPoint()
-
-    def eventFilter(self, obj, event):
-        if hasattr(self.parent, 'sidebar'):
-            if obj.objectName() in ["iconContainer", "titleBarIcon"]:
-                if event.type() == QEvent.Enter:
-                    self.parent.sidebar.expandBar()
-                    return True
-                elif event.type() == QEvent.Leave:
-                    global_pos = QCursor.pos()
-                    sidebar_rect = self.parent.sidebar.rect()
-                    sidebar_global_pos = self.parent.sidebar.mapToGlobal(QPoint(0, 0))
-                    sidebar_global_rect = QRect(sidebar_global_pos, self.parent.sidebar.size())
-                    
-                    if not sidebar_global_rect.contains(global_pos):
-                        if hasattr(self.parent.sidebar, "checkAndCollapseBar"):
-                            QTimer.singleShot(1000, self.parent.sidebar.checkAndCollapseBar)
-                    return True
-        
-        return super().eventFilter(obj, event)
-
-class StatusBar(QWidget):
-    fontSizeChanged = Signal(int)
-    previewModeChanged = Signal(bool)
-    highlightModeChanged = Signal(bool)
-    scrollToLineRequested = Signal(int)
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setFixedHeight(36)
-        # 初始化时不设置样式，在updateStyle中设置
-        
-        self.previewMode = False
-        self.highlightMode = True  # 默认开启高亮
-        self.currentFontSize = 15
-        
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(15, 3, 15, 3)
-        layout.setSpacing(8)
-        
-        leftButtons = QHBoxLayout()
-        leftButtons.setSpacing(12)
-        
-        buttonSize = 26
-        
-        settingsContainer = QWidget()
-        settingsContainer.setFixedSize(buttonSize, buttonSize)
-        settingsContainer.setStyleSheet("background-color: transparent;")
-        settingsLayout = QHBoxLayout(settingsContainer)
-        settingsLayout.setContentsMargins(0, 0, 0, 0)
-        
-        settingsBtn = IconButton("settings", 16)
-        settingsBtn.setToolTip("设置")
-        settingsLayout.addWidget(settingsBtn)
-        
-        highlightContainer = QWidget()
-        highlightContainer.setFixedSize(buttonSize, buttonSize)
-        highlightContainer.setStyleSheet("background-color: transparent;")
-        highlightLayout = QHBoxLayout(highlightContainer)
-        highlightLayout.setContentsMargins(0, 0, 0, 0)
-        
-        self.highlightBtn = IconButton("code", 16)
-        self.highlightBtn.setToolTip("语法高亮开关")
-        highlightLayout.addWidget(self.highlightBtn)
-        
-        fontSizeContainer = QWidget()
-        fontSizeContainer.setFixedSize(buttonSize, buttonSize)
-        fontSizeContainer.setStyleSheet("background-color: transparent;")
-        fontSizeLayout = QHBoxLayout(fontSizeContainer)
-        fontSizeLayout.setContentsMargins(0, 0, 0, 0)
-        
-        fontSizeBtn = IconButton("format_size", 16)
-        fontSizeBtn.setToolTip("调整字体大小")
-        fontSizeBtn.clicked.connect(self.showFontSizeMenu)
-        fontSizeLayout.addWidget(fontSizeBtn)
-        
-        scrollTestContainer = QWidget()
-        scrollTestContainer.setFixedSize(buttonSize, buttonSize)
-        scrollTestContainer.setStyleSheet("background-color: transparent;")
-        scrollTestLayout = QHBoxLayout(scrollTestContainer)
-        scrollTestLayout.setContentsMargins(0, 0, 0, 0)
-        
-        scrollTestBtn = IconButton("linear_scale", 16)
-        scrollTestBtn.setToolTip("测试滚动动画")
-        scrollTestBtn.clicked.connect(self.testScrollAnimation)
-        scrollTestLayout.addWidget(scrollTestBtn)
-        
-        leftButtons.addWidget(settingsContainer)
-        leftButtons.addWidget(highlightContainer)
-        leftButtons.addWidget(fontSizeContainer)
-        leftButtons.addWidget(scrollTestContainer)
-        
-        leftContainer = QWidget()
-        leftContainer.setStyleSheet("background-color: transparent;")
-        leftContainer.setLayout(leftButtons)
-        layout.addWidget(leftContainer)
-        
-        rightContainer = QWidget()
-        rightContainer.setStyleSheet("background-color: transparent;")
-        rightLayout = QHBoxLayout(rightContainer)
-        rightLayout.setContentsMargins(0, 0, 0, 0)
-        
-        self.lineCount = QLabel("0 行")
-        rightLayout.addWidget(self.lineCount)
-        
-        layout.addStretch(1)
-        layout.addWidget(rightContainer)
-        
-        # 应用初始样式
-        self.updateStyle()
-        
-        # 连接设置按钮点击事件
-        settingsBtn.clicked.connect(self.openSettings)
-        # 连接高亮按钮点击事件
-        self.highlightBtn.clicked.connect(self.toggleHighlightMode)
-    
-    def updateStyle(self):
-        """更新状态栏样式"""
-        if hasattr(self.parent(), 'themeManager') and self.parent().themeManager:
-            themeManager = self.parent().themeManager
-            status_style, icon_style, active_icon_style = themeManager.get_status_bar_style()
-            
-            # 应用状态栏样式
-            self.setStyleSheet(status_style)
-            
-            # 更新按钮样式
-            for btn in self.findChildren(IconButton):
-                if btn == self.highlightBtn and self.highlightMode:
-                    btn.setStyleSheet(active_icon_style)
-                else:
-                    btn.setStyleSheet(icon_style)
-            
-            # 更新行数标签样式
-            if themeManager.current_theme:
-                text_color = themeManager.current_theme.get("status_bar.text_color", "white")
-                self.lineCount.setStyleSheet(f"color: {text_color}; font-size: 12px; background-color: rgba(0, 0, 0, 0.2); padding: 3px 8px; border-radius: 4px;")
-        else:
-            # 默认样式
-            self.setStyleSheet("background-color: #1a1d23; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;")
-            self.lineCount.setStyleSheet("color: white; font-size: 12px; background-color: rgba(0, 0, 0, 0.2); padding: 3px 8px; border-radius: 4px;")
-            
-            # 默认按钮样式
-            button_style = "color: rgba(255, 255, 255, 0.7); hover { background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }"
-            for btn in self.findChildren(IconButton):
-                if btn == self.highlightBtn and self.highlightMode:
-                    btn.setStyleSheet("color: #6b9fff; hover { background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }")
-                else:
-                    btn.setStyleSheet(button_style)
-    
-    def openSettings(self):
-        try:
-            print("正在尝试打开设置...")
-            log_to_file("正在尝试打开设置...")
-            
-            parent_obj = self.parent()
-            if hasattr(parent_obj, "showSettings"):
-                parent_obj.showSettings()
-            else:
-                # 尝试使用顶层窗口
-                from PySide6.QtWidgets import QApplication, QMainWindow
-                main_windows = [w for w in QApplication.topLevelWidgets() if isinstance(w, QMainWindow)]
-                for w in main_windows:
-                    if hasattr(w, "showSettings"):
-                        w.showSettings()
-                        return
-                
-                # 如果找不到具有showSettings方法的窗口，显示默认消息
-                from PySide6.QtWidgets import QMessageBox
-                QMessageBox.information(self, "设置", "设置功能即将推出！")
-        except Exception as e:
-            error_msg = f"打开设置时出错: {e}"
-            print(error_msg)
-            log_to_file(error_msg)
-            import traceback
-            trace_info = traceback.format_exc()
-            print(trace_info)
-            log_to_file(trace_info)
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "错误", f"打开设置时出错: {str(e)}")
-    
-    def toggleHighlightMode(self):
-        self.highlightMode = not self.highlightMode
-        
-        if self.highlightMode:
-            self.highlightBtn.setStyleSheet("color: #6b9fff; hover { background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }")
-        else:
-            self.highlightBtn.setStyleSheet("color: rgba(255, 255, 255, 0.7); hover { background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }")
-        
-        # 发送高亮状态变化信号
-        try:
-            self.highlightModeChanged.emit(self.highlightMode)
-            print(f"高亮模式切换为: {self.highlightMode}")
-        except Exception as e:
-            print(f"在发送高亮状态变化信号时出错: {e}")
-            log_to_file(f"在发送高亮状态变化信号时出错: {e}")
-    
-    # 为向后兼容保留
-    def togglePreviewMode(self):
-        self.previewMode = not self.previewMode
-        self.previewModeChanged.emit(self.previewMode)
-    
-    def showFontSizeMenu(self):
-        from PySide6.QtWidgets import QMenu, QAction
-        
-        menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1e2128;
-                color: white;
-                border: 1px solid #2a2e36;
-                border-radius: 4px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 4px 25px 4px 10px;
-                border-radius: 3px;
-            }
-            QMenu::item:selected {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-        """)
-        
-        fontSizes = [12, 14, 15, 16, 18, 20]
-        for size in fontSizes:
-            action = QAction(f"{size}px", self)
-            action.triggered.connect(lambda checked, s=size: self.changeFontSize(s))
-            if size == self.currentFontSize:
-                action.setIcon(IconProvider.get_icon("check"))
-            menu.addAction(action)
-        
-        pos = self.mapToGlobal(self.findChild(QWidget, "", options=Qt.FindChildrenRecursively).pos())
-        pos.setY(pos.y() - menu.sizeHint().height())
-        menu.exec(pos)
-    
-    def changeFontSize(self, size):
-        self.currentFontSize = size
-        self.fontSizeChanged.emit(size)
-
-    def testScrollAnimation(self):
-        import random
-        random_line = random.randint(10, 100)
-        self.scrollToLineRequested.emit(random_line)
-
 class HanabiNotesApp(QMainWindow):
     def __init__(self):
-        super(HanabiNotesApp, self).__init__()
+        super().__init__()
+        # 设置窗口基本属性
+        self.setWindowTitle("Hanabi Notes")
+        self.resize(950, 700)
         
-        # 设置全局属性
-        self.theme = "dark"
+        # 初始化变量
         self.currentFilePath = None
+        self.currentEditor = None
         self.currentTitle = "未命名"
-        self.currentFileType = "text"
+        self.currentFileType = "text"  # 默认文件类型
         self.highlightMode = True
-        self.openFiles = []
-        self.editors = []
-        self.closedEditors = []  # 新增：跟踪已关闭的编辑器
+        self.lastDirectory = None
+        self.openFiles = []  # 已打开文件的列表
+        
+        # 窗口拖拽调整大小相关变量
+        self.resizeEdgeWidth = 8  # 拖拽区域宽度
+        self.isResizing = False
+        self.resizeMode = None  # 调整方向: None, 'left', 'right', 'top', 'bottom', 'topleft', 'topright', 'bottomleft', 'bottomright'
+        self.startPos = None
+        self.startGeometry = None
+        
+        # 初始化自动保存
+        self.autoSaveManager = AutoSave(self, interval=120)
+        
+        # 初始化自动备份
+        self.autoBackupManager = AutoBackup(self, max_backups=10)
+        
+        # 初始化主题
+        self.themeManager = ThemeManager()
+        
+        # 初始化编辑器管理器
+        self.editorManager = EditorManager(self)
         
         # 初始化优化器
         if 'app_Optimizer' in globals() and app_Optimizer:
@@ -586,18 +162,170 @@ class HanabiNotesApp(QMainWindow):
         # 初始化UI
         self.initUI()
     
-    def onFileLoaded(self, title, content):
-        activeInfo = self.sidebar.getActiveTabInfo()
-        if activeInfo:
-            for file_info in self.openFiles:
-                if file_info.get('index') == self.sidebar.activeTabIndex:
-                    editorIndex = file_info.get('editorIndex')
-                    if 0 <= editorIndex < len(self.editors):
-                        self.editors[editorIndex].setPlainText(content)
-                    break
+    def mousePressEvent(self, event):
+        """处理鼠标按下事件，检测是否在窗口边缘区域进行拖拽调整大小"""
+        if event.button() == Qt.LeftButton:
+            # 获取当前鼠标位置，检查是否在边缘区域
+            pos = event.position().toPoint()
+            resizeMode = self.getResizeMode(pos)
+            
+            if resizeMode:
+                # 如果在边缘区域，标记为正在调整大小
+                self.isResizing = True
+                self.resizeMode = resizeMode
+                self.startPos = pos
+                self.startGeometry = self.geometry()
+                event.accept()
+                return
         
-        self.currentTitle = title
-        self.setWindowTitle(f"Hanabi Notes - {title}")
+        # 如果不是调整大小操作，交给基类处理
+        super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        """处理鼠标移动事件，更新窗口大小或更新鼠标光标形状"""
+        pos = event.position().toPoint()
+        
+        # 如果正在调整大小
+        if self.isResizing and self.resizeMode:
+            # 计算鼠标移动的距离
+            dx = pos.x() - self.startPos.x()
+            dy = pos.y() - self.startPos.y()
+            
+            # 获取初始几何信息
+            newGeometry = QRect(self.startGeometry)
+            
+            # 根据调整模式更新窗口几何信息
+            if 'left' in self.resizeMode:
+                newGeometry.setLeft(self.startGeometry.left() + dx)
+            if 'right' in self.resizeMode:
+                newGeometry.setRight(self.startGeometry.right() + dx)
+            if 'top' in self.resizeMode:
+                newGeometry.setTop(self.startGeometry.top() + dy)
+            if 'bottom' in self.resizeMode:
+                newGeometry.setBottom(self.startGeometry.bottom() + dy)
+            
+            # 检查新大小是否满足最小尺寸要求
+            if newGeometry.width() >= self.minimumWidth() and newGeometry.height() >= self.minimumHeight():
+                self.setGeometry(newGeometry)
+            
+            event.accept()
+            return
+        elif not event.buttons() & Qt.LeftButton:
+            # 如果没有按下鼠标，更新鼠标光标形状
+            resizeMode = self.getResizeMode(pos)
+            if resizeMode:
+                if resizeMode == 'left' or resizeMode == 'right':
+                    self.setCursor(Qt.SizeHorCursor)
+                elif resizeMode == 'top' or resizeMode == 'bottom':
+                    self.setCursor(Qt.SizeVerCursor)
+                elif resizeMode == 'topleft' or resizeMode == 'bottomright':
+                    self.setCursor(Qt.SizeFDiagCursor)
+                elif resizeMode == 'topright' or resizeMode == 'bottomleft':
+                    self.setCursor(Qt.SizeBDiagCursor)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+        
+        # 交给基类处理
+        super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """处理鼠标释放事件，结束调整大小状态"""
+        if event.button() == Qt.LeftButton and self.isResizing:
+            self.isResizing = False
+            self.resizeMode = None
+            self.startPos = None
+            self.startGeometry = None
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+    
+    def getResizeMode(self, pos):
+        """
+        根据鼠标位置判断调整窗口的模式
+        返回值: None, 'left', 'right', 'top', 'bottom', 'topleft', 'topright', 'bottomleft', 'bottomright'
+        """
+        width = self.width()
+        height = self.height()
+        edge = self.resizeEdgeWidth
+        
+        # 判断鼠标是否在边缘区域
+        onLeft = pos.x() < edge
+        onRight = pos.x() > width - edge
+        onTop = pos.y() < edge
+        onBottom = pos.y() > height - edge
+        
+        # 根据位置确定调整模式
+        if onTop and onLeft:
+            return 'topleft'
+        elif onTop and onRight:
+            return 'topright'
+        elif onBottom and onLeft:
+            return 'bottomleft'
+        elif onBottom and onRight:
+            return 'bottomright'
+        elif onLeft:
+            return 'left'
+        elif onRight:
+            return 'right'
+        elif onTop:
+            return 'top'
+        elif onBottom:
+            return 'bottom'
+        
+        return None
+    
+    def onFileLoaded(self, filePath):
+        """加载文件后的回调函数，设置当前文件路径和更新UI"""
+        try:
+            fileName = os.path.basename(filePath)
+            self.currentFilePath = filePath
+            
+            # 根据文件后缀自动确定文件类型
+            self.currentFileType = self.editorManager.detectFileType(filePath)
+            
+            # 设置对应的语法高亮
+            if hasattr(self, 'currentEditor') and self.currentEditor is not None:
+                if self.currentFileType == 'python':
+                    self.currentEditor.setSyntaxHighlightFromName('python')
+                elif self.currentFileType == 'markdown':
+                    self.currentEditor.setSyntaxHighlightFromName('markdown')
+                elif self.currentFileType == 'html':
+                    self.currentEditor.setSyntaxHighlightFromName('html')
+                elif self.currentFileType in ['javascript', 'json']:
+                    self.currentEditor.setSyntaxHighlightFromName('javascript')
+                elif self.currentFileType in ['c', 'cpp']:
+                    self.currentEditor.setSyntaxHighlightFromName('cpp')
+                else:
+                    self.currentEditor.setSyntaxHighlightFromName('text')
+                
+                # 更新标签显示文件类型信息
+                if self.tabWidget.count() > 0:
+                    self.tabWidget.setTabToolTip(self.tabWidget.currentIndex(), f"{filePath} [{self.currentFileType}]")
+            
+            # 更新窗口标题和最近打开的文件列表
+            self.setWindowTitle(f"{fileName} - Hanabi Notes")
+            self.addToRecentFiles(filePath)
+            self.updateWindowTitle()
+            
+            # 更新文件信息显示
+            fileInfo = self.getFileInfo(filePath)
+            self.updateFileInfo(fileInfo)
+            
+            # 更新文件已加载标志
+            for fileData in self.openFiles:
+                if fileData.get('filePath') == filePath:
+                    fileData['isLoaded'] = True
+                    break
+            
+            # 通知自动保存系统文件已加载
+            if self.autoSaveManager:
+                self.autoSaveManager.file_saved(filePath)
+            
+            print(f"文件已加载: {fileName}")
+        except Exception as e:
+            self.logError(f"加载文件后处理出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def onFileSaved(self, filePath, message):
         self.currentFilePath = filePath
@@ -613,16 +341,36 @@ class HanabiNotesApp(QMainWindow):
                     file_info['title'] = fileName
                     break
         
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(self, "保存成功", message)
+        HanabiMessageBox.information(self, "保存成功", message)
     
     def deleteFile(self):
         # 使用FileManager中的delete_file功能
         delete_file(self)
     
     def changeFontSize(self, size):
+        """更改所有编辑器的字体大小"""
+        print(f"应用新的字体大小到所有编辑器: {size}")
+        
+        # 更新所有编辑器的字体样式
         for editor in self.editors:
             self.updateEditorStyle(editor, size)
+        
+        # 不使用showMessage方法，改为使用状态栏的其他方式或简单地打印日志
+        try:
+            if hasattr(self, 'statusBarWidget'):
+                # 如果状态栏有message标签，可以用它显示消息
+                if hasattr(self.statusBarWidget, 'message') and callable(getattr(self.statusBarWidget, 'setMessage', None)):
+                    self.statusBarWidget.setMessage(f"字体大小已更改为 {size}px")
+                elif hasattr(self.statusBarWidget, 'infoLabel') and hasattr(self.statusBarWidget.infoLabel, 'setText'):
+                    # 如果有infoLabel，可以使用它
+                    self.statusBarWidget.infoLabel.setText(f"字体大小已更改为 {size}px")
+                else:
+                    # 如果都没有，只打印日志
+                    print(f"字体大小已更改为 {size}px")
+        except Exception as e:
+            # 如果出错，确保不影响主要功能
+            print(f"显示字体大小变更消息时出错: {e}")
+            print(f"字体大小已更改为 {size}px")
     
     def togglePreviewMode(self, enabled):
         currentEditorIndex = self.editorsStack.currentIndex()
@@ -652,404 +400,131 @@ class HanabiNotesApp(QMainWindow):
     
     def updateEditorStyle(self, editor, fontSize=15):
         """更新编辑器样式"""
-        print(f"开始更新编辑器样式，字体大小: {fontSize}")
-        
-        # 确定当前主题
-        theme_name = "dark"  # 默认主题
-        
-        # 尝试从主题管理器获取当前主题名称
-        if hasattr(self, 'themeManager'):
-            if hasattr(self.themeManager, 'current_theme_name'):
-                theme_name = self.themeManager.current_theme_name
-                print(f"从主题管理器获取当前主题名称: {theme_name}")
-            elif hasattr(self, 'currentTheme'):
-                theme_name = self.currentTheme
-                print(f"从应用程序获取当前主题名称: {theme_name}")
-        
-        # 检查是否为亮色主题
-        is_light_theme = theme_name == "light"
-        print(f"是否为亮色主题: {is_light_theme}")
-        
-        # 默认颜色
-        bg_color = '#ffffff' if is_light_theme else '#282c34'
-        text_color = '#333333' if is_light_theme else '#abb2bf'
-        selection_bg = '#b3d4fc' if is_light_theme else '#528bff'
-        selection_text = '#333333' if is_light_theme else '#ffffff'
-        scrollbar_bg = '#f5f5f5' if is_light_theme else '#2c313a'
-        scrollbar_handle = '#c1c1c1' if is_light_theme else '#4b5362'
-        
-        # 从主题中获取颜色（如果有）
-        if hasattr(self, 'themeManager') and self.themeManager.current_theme:
-            # 如果是Theme对象并有get方法
-            if hasattr(self.themeManager.current_theme, 'get'):
-                bg_color = self.themeManager.current_theme.get("editor.background", bg_color)
-                text_color = self.themeManager.current_theme.get("editor.text_color", text_color)
-                selection_bg = self.themeManager.current_theme.get("editor.selection_color", selection_bg)
-            # 如果是Theme对象有data属性
-            elif hasattr(self.themeManager.current_theme, 'data') and isinstance(self.themeManager.current_theme.data, dict):
-                if 'editor' in self.themeManager.current_theme.data:
-                    editor_data = self.themeManager.current_theme.data['editor']
-                    bg_color = editor_data.get('background', bg_color)
-                    text_color = editor_data.get('text_color', text_color)
-                    selection_bg = editor_data.get('selection_color', selection_bg)
-            # 如果是字典
-            elif isinstance(self.themeManager.current_theme, dict):
-                if 'editor' in self.themeManager.current_theme:
-                    editor_data = self.themeManager.current_theme['editor']
-                    bg_color = editor_data.get('background', bg_color)
-                    text_color = editor_data.get('text_color', text_color)
-                    selection_bg = editor_data.get('selection_color', selection_bg)
-        
-        # 设置配色方案
-        editor.setStyleSheet("""
-            QPlainTextEdit {
-                background-color: %s;
-                color: %s;
-                border: none;
-                padding: 10px;
-                selection-background-color: %s;
-                selection-color: %s;
-                font-family: %s;
-            }
-            QScrollBar:vertical {
-                border: none;
-                background: %s;
-                width: 10px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: %s;
-                min-height: 20px;
-                border-radius: 5px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-                height: 0px;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-            QScrollBar:horizontal {
-                border: none;
-                background: %s;
-                height: 10px;
-                margin: 0px;
-            }
-            QScrollBar::handle:horizontal {
-                background: %s;
-                min-width: 20px;
-                border-radius: 5px;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                border: none;
-                background: none;
-                width: 0px;
-            }
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-                background: none;
-            }
-        """ % (
-            bg_color,  # 背景色
-            text_color,  # 文本颜色
-            selection_bg,  # 选择背景色
-            selection_text,  # 选择文本颜色
-            "Consolas, 'Microsoft YaHei UI', '微软雅黑', monospace",  # 字体
-            scrollbar_bg,  # 滚动条背景色
-            scrollbar_handle,  # 滚动条滑块色
-            scrollbar_bg,  # 水平滚动条背景色
-            scrollbar_handle  # 水平滚动条滑块色
-        ))
-        
-        # 设置字体大小
-        font = editor.font()
-        font.setPointSize(fontSize)
-        editor.setFont(font)
-        
-        print("编辑器样式更新完成")
+        self.editorManager.updateEditorStyle(editor, fontSize)
     
     def updateEditorContainerStyle(self, container):
         """更新编辑器容器样式"""
-        
-        # 确定当前主题
-        theme_name = "dark"  # 默认主题
-        
-        # 尝试获取当前主题名称
-        if hasattr(self, 'themeManager') and self.themeManager:
-            if hasattr(self.themeManager, 'current_theme_name'):
-                theme_name = self.themeManager.current_theme_name
-            elif hasattr(self, 'currentTheme'):
-                theme_name = self.currentTheme
-                
-        # 检查是否为亮色主题
-        is_light_theme = theme_name == "light"
-        
-        # 默认颜色
-        bg_color = '#ffffff' if is_light_theme else '#282c34'
-        border_color = '#e5e5e5' if is_light_theme else '#343a45'
-        
-        # 从主题获取颜色（如果可用）
-        if hasattr(self, 'themeManager') and self.themeManager and self.themeManager.current_theme:
-            # 主题对象有get方法
-            if hasattr(self.themeManager.current_theme, 'get'):
-                bg_color = self.themeManager.current_theme.get("editor.background", bg_color)
-                border_color = self.themeManager.current_theme.get("editor.border_color", border_color)
-            # 主题对象有data属性
-            elif hasattr(self.themeManager.current_theme, 'data') and isinstance(self.themeManager.current_theme.data, dict):
-                if 'editor' in self.themeManager.current_theme.data:
-                    editor_data = self.themeManager.current_theme.data['editor']
-                    bg_color = editor_data.get('background', bg_color)
-                    border_color = editor_data.get('border_color', border_color)
-            # 主题是字典
-            elif isinstance(self.themeManager.current_theme, dict):
-                if 'editor' in self.themeManager.current_theme:
-                    editor_data = self.themeManager.current_theme['editor']
-                    bg_color = editor_data.get('background', bg_color)
-                    border_color = editor_data.get('border_color', border_color)
-        
-        # 设置容器样式
-        container.setStyleSheet(f"""
-            QWidget {{
-                background-color: {bg_color};
-                border: 1px solid {border_color};
-                border-radius: 5px;
-            }}
-        """)
+        self.editorManager.updateEditorContainerStyle(container)
     
     def updatePreview(self, editorIndex):
         """更新预览区域，将编辑器内容转换为预览格式"""
-        if not hasattr(self, 'markdown') or not self.markdown:
-            return
-            
-        if 0 <= editorIndex < len(self.editors) and editorIndex < len(self.previewViews):
-            editor = self.editors[editorIndex]
-            previewView = self.previewViews[editorIndex]
-            
-            text = editor.toPlainText()
-            
-            try:
-                # 使用markdown库转换内容
-                html = self.markdown.markdown(text, extensions=['tables', 'fenced_code'])
+        try:
+            if not hasattr(self, 'markdown') or not self.markdown:
+                print("Markdown模块未加载，预览功能不可用")
+                return
                 
-                # 添加基本样式
-                is_light_theme = hasattr(self, 'currentTheme') and self.currentTheme == "light"
+            if 0 <= editorIndex < len(self.editors) and editorIndex < len(self.previewViews):
+                editor = self.editors[editorIndex]
+                previewView = self.previewViews[editorIndex]
                 
-                bg_color = '#ffffff' if is_light_theme else '#282c34'
-                text_color = '#333333' if is_light_theme else '#abb2bf'
-                link_color = '#4183c4' if is_light_theme else '#61afef'
-                code_bg = '#f5f5f5' if is_light_theme else '#3a3f4b'
+                text = editor.toPlainText()
                 
-                # 从主题获取颜色（如果可用）
-                if hasattr(self, 'themeManager') and self.themeManager and self.themeManager.current_theme:
-                    if hasattr(self.themeManager.current_theme, 'get'):
-                        bg_color = self.themeManager.current_theme.get("editor.background", bg_color)
-                        text_color = self.themeManager.current_theme.get("editor.text_color", text_color)
-                
-                styled_html = f"""
-                <html>
-                <head>
-                    <style>
-                        body {{ 
-                            font-family: 'Microsoft YaHei UI', Arial, sans-serif; 
-                            line-height: 1.6;
-                            color: {text_color};
-                            background-color: {bg_color};
-                            padding: 5px;
-                        }}
-                        h1, h2, h3, h4, h5, h6 {{ 
-                            margin-top: 24px;
-                            margin-bottom: 16px;
-                            font-weight: 600;
-                            line-height: 1.25;
-                        }}
-                        h1 {{ font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }}
-                        h2 {{ font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }}
-                        a {{ color: {link_color}; text-decoration: none; }}
-                        a:hover {{ text-decoration: underline; }}
-                        code {{ 
-                            font-family: "Consolas", "Courier New", monospace; 
-                            background-color: {code_bg};
-                            padding: 0.2em 0.4em;
-                            border-radius: 3px;
-                        }}
-                        pre {{ 
-                            background-color: {code_bg}; 
-                            border-radius: 3px; 
-                            padding: 16px;
-                            overflow: auto;
-                        }}
-                        pre code {{ 
-                            background-color: transparent; 
-                            padding: 0;
-                        }}
-                        blockquote {{ 
-                            padding: 0 1em; 
-                            color: #6a737d; 
-                            border-left: 0.25em solid #dfe2e5; 
-                        }}
-                        table {{ 
-                            border-collapse: collapse; 
-                            width: 100%; 
-                            margin-bottom: 16px; 
-                        }}
-                        table th, table td {{ 
-                            border: 1px solid #dfe2e5; 
-                            padding: 6px 13px; 
-                        }}
-                        table tr {{ 
-                            background-color: {bg_color}; 
-                        }}
-                        table tr:nth-child(2n) {{ 
-                            background-color: #f6f8fa; 
-                        }}
-                    </style>
-                </head>
-                <body>
-                    {html}
-                </body>
-                </html>
-                """
-                
-                # 设置为纯文本，以便正确显示HTML格式
-                previewView.setPlainText(styled_html)
-            except Exception as e:
-                previewView.setPlainText(f"预览生成出错: {str(e)}")
+                try:
+                    # 使用markdown库转换内容
+                    html = self.markdown.markdown(text, extensions=['tables', 'fenced_code'])
+                    
+                    # 添加基本样式
+                    is_light_theme = hasattr(self, 'currentTheme') and self.currentTheme == "light"
+                    
+                    bg_color = '#ffffff' if is_light_theme else '#282c34'
+                    text_color = '#333333' if is_light_theme else '#abb2bf'
+                    link_color = '#4183c4' if is_light_theme else '#61afef'
+                    code_bg = '#f5f5f5' if is_light_theme else '#3a3f4b'
+                    
+                    # 从主题获取颜色（如果可用）
+                    if hasattr(self, 'themeManager') and self.themeManager and self.themeManager.current_theme:
+                        if hasattr(self.themeManager.current_theme, 'get'):
+                            bg_color = self.themeManager.current_theme.get("editor.background", bg_color)
+                            text_color = self.themeManager.current_theme.get("editor.text_color", text_color)
+                    
+                    styled_html = f"""
+                    <html>
+                    <head>
+                        <style>
+                            body {{ 
+                                font-family: 'Microsoft YaHei UI', Arial, sans-serif; 
+                                line-height: 1.6;
+                                color: {text_color};
+                                background-color: {bg_color};
+                                padding: 5px;
+                            }}
+                            h1, h2, h3, h4, h5, h6 {{ 
+                                margin-top: 24px;
+                                margin-bottom: 16px;
+                                font-weight: 600;
+                                line-height: 1.25;
+                            }}
+                            h1 {{ font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }}
+                            h2 {{ font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }}
+                            a {{ color: {link_color}; text-decoration: none; }}
+                            a:hover {{ text-decoration: underline; }}
+                            code {{ 
+                                font-family: "Consolas", "Courier New", monospace; 
+                                background-color: {code_bg};
+                                padding: 0.2em 0.4em;
+                                border-radius: 3px;
+                            }}
+                            pre {{ 
+                                background-color: {code_bg}; 
+                                border-radius: 3px; 
+                                padding: 16px;
+                                overflow: auto;
+                            }}
+                            pre code {{ 
+                                background-color: transparent; 
+                                padding: 0;
+                            }}
+                            blockquote {{ 
+                                padding: 0 1em; 
+                                color: #6a737d; 
+                                border-left: 0.25em solid #dfe2e5; 
+                            }}
+                            table {{ 
+                                border-collapse: collapse; 
+                                width: 100%; 
+                                margin-bottom: 16px; 
+                            }}
+                            table th, table td {{ 
+                                border: 1px solid #dfe2e5; 
+                                padding: 6px 13px; 
+                            }}
+                            table tr {{ 
+                                background-color: {bg_color}; 
+                            }}
+                            table tr:nth-child(2n) {{ 
+                                background-color: #f6f8fa; 
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        {html}
+                    </body>
+                    </html>
+                    """
+                    
+                    # 设置为纯文本，以便正确显示HTML格式
+                    previewView.setPlainText(styled_html)
+                except Exception as e:
+                    previewView.setPlainText(f"预览生成出错: {str(e)}")
+        except Exception as e:
+            print(f"更新预览区域时出错: {str(e)}")
+            # 不要抛出异常，避免应用崩溃
     
     def updateStatusBarStyle(self):
-        """更新状态栏样式"""
         if hasattr(self, 'statusBarWidget'):
             self.statusBarWidget.updateStyle()
     
     def scrollToLine(self, editor, lineNumber):
-        """滚动编辑器到指定行"""
-        if not editor:
-            return
-        
-        # 检查文档是否为空
-        if editor.document().isEmpty():
-            print("无法滚动到指定行：文档为空")
-            return
-            
-        # 检查行号是否有效
-        total_lines = editor.document().blockCount()
-        if lineNumber <= 0 or lineNumber > total_lines:
-            print(f"无法滚动到指定行：行号 {lineNumber} 超出范围 (1-{total_lines})")
-            return
-            
-        block = editor.document().findBlockByLineNumber(lineNumber - 1)
-        if block.isValid():
-            # 创建文本光标并移动到指定行
-            cursor = QTextCursor(block)
-            editor.setTextCursor(cursor)
-            
-            # 确保该行在视图中间
-            editor.centerCursor()
-            
-            # 高亮显示该行
-            selection = QTextEdit.ExtraSelection()
-            selection.format.setBackground(QColor("#4077c866"))  # 半透明蓝色高亮
-            selection.format.setProperty(QTextFormat.FullWidthSelection, True)
-            selection.cursor = editor.textCursor()
-            selection.cursor.clearSelection()
-            
-            editor.setExtraSelections([selection])
-            
-            # 使用动画闪烁效果
-            self.highlightCurrentLine(editor)
-        else:
-            print(f"无法滚动到指定行：行号 {lineNumber} 对应的文本块无效")
+        self.editorManager.scrollToLine(editor, lineNumber)
     
     def applyHighlighter(self, editor):
-        """应用语法高亮器到编辑器"""
-        if not hasattr(self, 'highlightMode') or not self.highlightMode:
-            return
-            
-        # 清除现有的高亮器
-        if hasattr(editor, 'highlighter') and editor.highlighter:
-            editor.highlighter.setDocument(None)
-        
-        # 确定文件类型
-        fileType = self.currentFileType
-        
-        # 确定是否为亮色主题
-        is_light_theme = False
-        if hasattr(self, 'currentTheme'):
-            is_light_theme = self.currentTheme == "light"
-        
-        # 创建新的高亮器
-        try:
-            highlighter = get_highlighter(fileType, editor.document(), is_light_theme)
-            if highlighter:
-                editor.highlighter = highlighter
-                print(f"已应用 {fileType} 语法高亮器")
-            else:
-                editor.highlighter = None
-                print(f"未找到 {fileType} 对应的语法高亮器")
-        except Exception as e:
-            print(f"应用语法高亮器时出错: {e}")
-            log_to_file(f"应用语法高亮器时出错: {e}")
-            editor.highlighter = None
+        self.editorManager.applyHighlighter(editor, self.currentFileType)
     
     def highlightCurrentLine(self, editor):
-        """高亮当前行，带有闪烁效果"""
-        if not editor:
-            return
-            
-        # 检查文档是否为空
-        if editor.document().isEmpty():
-            print("无法高亮当前行：文档为空")
-            return
-            
-        # 获取当前行的文本光标
-        cursor = editor.textCursor()
-        
-        # 检查光标位置是否有效
-        if cursor.position() < 0 or cursor.position() > editor.document().characterCount():
-            print(f"无法高亮当前行：光标位置 {cursor.position()} 无效")
-            return
-            
-        cursor.select(QTextCursor.LineUnderCursor)
-        selection = QTextEdit.ExtraSelection()
-        
-        # 初始颜色
-        highlight_color = QColor("#4077c866")  # 半透明蓝色高亮
-        
-        selection.format.setBackground(highlight_color)
-        selection.format.setProperty(QTextFormat.FullWidthSelection, True)
-        selection.cursor = cursor
-        
-        editor.setExtraSelections([selection])
-        
-        # 简单的闪烁效果
-        def flash_highlight():
-            nonlocal editor
-            
-            if not editor:
-                return
-                
-            # 清除高亮
-            editor.setExtraSelections([])
-            
-            # 延迟后恢复高亮
-            QTimer.singleShot(300, lambda: self.restoreFormat(editor))
-        
-        # 延迟启动闪烁效果
-        QTimer.singleShot(500, flash_highlight)
+        self.editorManager.highlightCurrentLine(editor)
     
     def restoreFormat(self, editor):
-        """恢复行高亮"""
-        if not editor:
-            return
-            
-        cursor = editor.textCursor()
-        cursor.select(QTextCursor.LineUnderCursor)
-        selection = QTextEdit.ExtraSelection()
-        
-        selection.format.setBackground(QColor("#4077c833"))  # 更淡的高亮
-        selection.format.setProperty(QTextFormat.FullWidthSelection, True)
-        selection.cursor = cursor
-        
-        editor.setExtraSelections([selection])
+        self.editorManager.restoreFormat(editor)
     
     def initUI(self):
         self.setWindowFlags(Qt.FramelessWindowHint)
@@ -1088,7 +563,7 @@ class HanabiNotesApp(QMainWindow):
         min_height = max(min_height, 600)
         self.setMinimumSize(min_width, min_height)
         
-        self.dragging = False
+        self.dragging = True
         
         IconProvider.init_font()
         
@@ -1108,8 +583,7 @@ class HanabiNotesApp(QMainWindow):
             self.autoSave = AutoSave(self)
             self.autoSave.start()
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "错误", f"无法加载文件管理器模块: {str(e)}")
+            HanabiMessageBox.critical(self, "错误", f"无法加载文件管理器模块: {str(e)}")
         
         self.openFiles = []
         self.currentFilePath = None
@@ -1146,6 +620,9 @@ class HanabiNotesApp(QMainWindow):
         self.editors = []
         self.previewViews = []
         
+        # 添加堆栈改变信号连接，更新当前编辑器
+        self.editorsStack.currentChanged.connect(self.onEditorStackChanged)
+        
         editorWidget = QWidget()
         editorWidget.setObjectName("editorContainer")
         editorLayout = QVBoxLayout(editorWidget)
@@ -1171,8 +648,7 @@ class HanabiNotesApp(QMainWindow):
             import markdown
             self.markdown = markdown
         except ImportError:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "缺少依赖", "未安装markdown模块，预览功能不可用。请执行 pip install markdown 安装。")
+            HanabiMessageBox.warning(self, "缺少依赖", "未安装markdown模块，预览功能不可用。请执行 pip install markdown 安装。")
             self.markdown = None
         
         # 创建初始编辑器并在openFiles列表中记录
@@ -1242,13 +718,16 @@ class HanabiNotesApp(QMainWindow):
             self.centralWidget().setStyleSheet(window_style)
             print("已应用窗口样式")
         
-        # 更新编辑器样式
-        fontSize = self.statusBarWidget.currentFontSize if hasattr(self, 'statusBarWidget') else 15
+        # 保存当前字体大小
+        current_font_size = 15  # 默认值
+        if hasattr(self, 'statusBarWidget') and hasattr(self.statusBarWidget, 'currentFontSize'):
+            current_font_size = self.statusBarWidget.currentFontSize
         
+        # 更新编辑器样式
         print(f"准备更新编辑器样式，编辑器数量: {len(self.editors) if hasattr(self, 'editors') else 0}")
         for i, editor in enumerate(self.editors if hasattr(self, 'editors') else []):
             print(f"更新编辑器 {i} 的样式")
-            self.updateEditorStyle(editor, fontSize)
+            self.updateEditorStyle(editor, current_font_size)
             
         # 更新编辑器容器样式
         if hasattr(self, 'editorsStack'):
@@ -1312,8 +791,14 @@ class HanabiNotesApp(QMainWindow):
         
         print(f"创建编辑器时的当前主题: {theme_name}")
         
+        # 获取字体大小设置
+        font_size = 15  # 默认字体大小
+        if hasattr(self, 'statusBarWidget') and hasattr(self.statusBarWidget, 'currentFontSize'):
+            font_size = self.statusBarWidget.currentFontSize
+            print(f"使用状态栏中的字体大小: {font_size}")
+        
         # 设置编辑器样式
-        self.updateEditorStyle(editor, 15)
+        self.updateEditorStyle(editor, font_size)
         editor.setPlaceholderText("输入内容...")
         
         try:
@@ -1378,6 +863,9 @@ class HanabiNotesApp(QMainWindow):
         editorIndex = len(self.editors) - 1
         self.editorsStack.setCurrentIndex(editorIndex)
         
+        # 设置当前编辑器 - 修复保存问题
+        self.currentEditor = editor
+        
         print(f"新编辑器创建完成，索引: {editorIndex}")
         return editorIndex
     
@@ -1385,24 +873,17 @@ class HanabiNotesApp(QMainWindow):
         # 使用FileManager中的open_file功能
         open_file(self)
     
-    def saveFile(self):
-        # 使用FileManager中的save_file功能
-        save_file(self)
-        # 如果有自动保存功能，更新时间戳
-        if hasattr(self, 'autoSave'):
-            if self.currentFilePath:
-                self.autoSave.file_saved(self.currentFilePath)
+    def saveFile(self, savePath=None):
+        save_file(self, savePath)
     
     def newFile(self):
         # 使用FileManager中的new_file功能
         new_file(self)
     
     def closeFile(self, filePath):
-        # 使用FileManager中的close_file功能
         close_file(self, filePath)
     
     def printOpenFilesList(self):
-        """打印当前打开的文件列表，用于调试"""
         print("\n--- 当前打开的文件列表 ---")
         for i, file_info in enumerate(self.openFiles):
             index = file_info.get('index', 'N/A')
@@ -1417,6 +898,12 @@ class HanabiNotesApp(QMainWindow):
         # 使用FileManager中的change_file功能
         change_file(self, filePath, fileName)
         
+        # 确保currentEditor更新
+        current_index = self.editorsStack.currentIndex()
+        if 0 <= current_index < len(self.editors):
+            self.currentEditor = self.editors[current_index]
+            print(f"切换文件后更新当前编辑器为编辑器 {current_index}")
+
     def updateLineCount(self, editor):
         """更新行数统计"""
         if not editor or not hasattr(self, 'statusBarWidget'):
@@ -1522,8 +1009,7 @@ class HanabiNotesApp(QMainWindow):
             trace_info = traceback.format_exc()
             print(trace_info)
             log_to_file(trace_info)
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "错误", f"打开设置对话框时出错: {str(e)}")
+            HanabiMessageBox.warning(self, "错误", f"打开设置对话框时出错: {str(e)}")
     
     def showThemeSettings(self):
         """显示主题设置对话框"""
@@ -1540,8 +1026,7 @@ class HanabiNotesApp(QMainWindow):
             trace_info = traceback.format_exc()
             print(trace_info)
             log_to_file(trace_info)
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "错误", f"打开主题设置对话框时出错: {str(e)}")
+            HanabiMessageBox.warning(self, "错误", f"打开主题设置对话框时出错: {str(e)}")
     
     def onSettingsChanged(self):
         """当设置改变时被调用"""
@@ -1554,10 +1039,15 @@ class HanabiNotesApp(QMainWindow):
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                 
-                # 应用字体设置
+                # 应用字体设置 (只检查字体大小变化)
                 if "editor" in settings and "font" in settings["editor"]:
+                    # 字体设置已更改，需要重新应用所有编辑器样式
                     font_size = settings["editor"]["font"].get("size", 15)
-                    self.changeFontSize(font_size)
+                    
+                    # 更新所有编辑器样式
+                    print(f"应用新的字体设置到所有编辑器")
+                    for editor in self.editors:
+                        self.updateEditorStyle(editor, font_size)
                 
                 # 应用其他设置
                 # ...
@@ -1565,15 +1055,166 @@ class HanabiNotesApp(QMainWindow):
                 print("设置已更新")
         except Exception as e:
             print(f"应用设置时出错: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
     
     def onThemeChanged(self, theme_name):
         """当主题改变时被调用"""
         try:
+            # 获取当前字体大小，确保主题变化不会覆盖字体大小
+            current_font_size = 15  # 默认大小
+            if hasattr(self, 'statusBarWidget') and hasattr(self.statusBarWidget, 'currentFontSize'):
+                current_font_size = self.statusBarWidget.currentFontSize
+                print(f"主题切换前保存当前字体大小: {current_font_size}")
+            
             # 应用主题
             self.applyTheme(theme_name)
-            print(f"主题已更改为: {theme_name}")
+            
+            # 确保字体大小不变
+            for editor in self.editors:
+                self.updateEditorStyle(editor, current_font_size)
+            
+            print(f"主题已更改为: {theme_name}，保持字体大小: {current_font_size}")
         except Exception as e:
             print(f"应用主题时出错: {str(e)}")
+
+    def closeEvent(self, event):
+        """关闭程序时的事件处理"""
+        # 检查是否有未保存的文件
+        unsavedFiles = []
+        for fileInfo in self.openFiles:
+            if fileInfo.get('isModified', False):
+                filePath = fileInfo.get('filePath')
+                fileName = os.path.basename(filePath) if filePath else "未命名"
+                unsavedFiles.append(fileName)
+        
+        # 如果有未保存的文件，提示用户
+        if unsavedFiles:
+            message = f"以下文件尚未保存:\n{', '.join(unsavedFiles)}\n\n是否保存这些文件？"
+            reply = HanabiMessageBox.question(
+                self, "未保存的文件", message)
+            
+            if reply == HanabiMessageBox.Yes_Result:
+                # 保存所有未保存的文件
+                for fileInfo in self.openFiles:
+                    if fileInfo.get('isModified', False):
+                        self.saveFileByIndex(fileInfo.get('index'))
+            elif reply == HanabiMessageBox.Cancel_Result:
+                # 取消关闭
+                event.ignore()
+                return
+        
+        # 备份所有打开的文件
+        if hasattr(self, 'autoBackupManager') and self.autoBackupManager:
+            self.autoBackupManager.backup_all_open_files()
+        
+        # 保存应用程序状态
+        self.saveAppState()
+        
+        # 接受关闭事件
+        event.accept()
+
+    def saveFileByIndex(self, index):
+        """根据索引保存文件"""
+        try:
+            # 查找对应的文件信息
+            fileInfo = None
+            for info in self.openFiles:
+                if info.get('index') == index:
+                    fileInfo = info
+                    break
+            
+            if not fileInfo:
+                print(f"无法找到索引为 {index} 的文件信息")
+                return False
+            
+            # 获取编辑器索引和文件路径
+            editorIndex = fileInfo.get('editorIndex')
+            filePath = fileInfo.get('filePath')
+            
+            if editorIndex is None or editorIndex < 0 or editorIndex >= len(self.editors):
+                print(f"无效的编辑器索引: {editorIndex}")
+                return False
+            
+            # 获取编辑器内容
+            editor = self.editors[editorIndex]
+            content = editor.toPlainText()
+            
+            # 如果没有文件路径，需要提示用户选择保存位置
+            if not filePath:
+                return self.saveFile()
+            
+            # 保存文件
+            with open(filePath, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # 更新文件状态
+            fileInfo['isModified'] = False
+            
+            print(f"文件已保存: {filePath}")
+            return True
+        except Exception as e:
+            print(f"保存文件时出错: {e}")
+            return False
+
+    def saveAppState(self):
+        """保存应用程序状态"""
+        try:
+            # 创建配置目录
+            config_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+            
+            # 保存最近文件列表
+            if hasattr(self, 'recentFiles'):
+                recent_files_path = os.path.join(config_dir, "recent_files.json")
+                with open(recent_files_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.recentFiles, f, ensure_ascii=False)
+            
+            # 保存当前主题
+            if hasattr(self, 'currentTheme'):
+                settings_path = os.path.join(config_dir, "settings.json")
+                settings = {}
+                
+                # 读取现有设置
+                if os.path.exists(settings_path):
+                    try:
+                        with open(settings_path, 'r', encoding='utf-8') as f:
+                            settings = json.load(f)
+                    except:
+                        settings = {}
+                
+                # 更新主题设置
+                if 'appearance' not in settings:
+                    settings['appearance'] = {}
+                
+                settings['appearance']['theme'] = self.currentTheme
+                
+                # 保存设置
+                with open(settings_path, 'w', encoding='utf-8') as f:
+                    json.dump(settings, f, ensure_ascii=False, indent=2)
+            
+            print("应用程序状态已保存")
+        except Exception as e:
+            print(f"保存应用程序状态时出错: {e}")
+
+    # 添加一个新方法用于处理编辑器堆栈改变的信号
+    def onEditorStackChanged(self, index):
+        """当编辑器堆栈当前索引改变时更新当前编辑器"""
+        if 0 <= index < len(self.editors):
+            self.currentEditor = self.editors[index]
+            print(f"当前编辑器已更新为编辑器 {index}")
+            
+            # 更新当前文件路径
+            for file_info in self.openFiles:
+                if file_info.get('editorIndex') == index:
+                    self.currentFilePath = file_info.get('filePath')
+                    self.currentTitle = file_info.get('title', '未命名')
+                    print(f"当前文件路径已更新: {self.currentFilePath}")
+                    break
+        else:
+            print(f"警告: 无效的编辑器索引 {index}")
+            
 
 if __name__ == "__main__":
     # 创建QApplication实例

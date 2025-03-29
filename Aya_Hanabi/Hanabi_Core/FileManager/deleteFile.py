@@ -1,5 +1,5 @@
 import os
-from PySide6.QtWidgets import QMessageBox
+from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
 
 def delete_file(self):
     """
@@ -10,27 +10,24 @@ def delete_file(self):
     """
     activeInfo = self.sidebar.getActiveTabInfo()
     if not activeInfo or not activeInfo.get('filePath'):
-        QMessageBox.information(self, "删除文件", "没有打开的文件可以删除。")
+        information(self, "删除文件", "没有打开的文件可以删除。")
         return
     
     filePath = activeInfo.get('filePath')
     fileName = activeInfo.get('fileName')
     
-    reply = QMessageBox.question(
-        self, "删除文件", 
-        f"确定要删除文件 {fileName} 吗？此操作不可恢复。",
-        QMessageBox.Yes | QMessageBox.No,
-        QMessageBox.No
-    )
+    reply = question(
+        self, "删除文件", f"确定要删除文件 {fileName} 吗？此操作不可恢复。", HanabiMessageBox.YesNo)
     
-    if reply == QMessageBox.Yes:
+    if reply == HanabiMessageBox.Yes_Result:
         try:
             # 使用FileManager来删除文件
             success = self.fileManager.deleteFile(filePath, self)
             if success:
                 self.sidebar.closeTab(self.sidebar.activeTabIndex)
-                QMessageBox.information(self, "删除成功", "文件已成功删除。")
+                information(self, "删除成功", "文件已成功删除。")
         except Exception as e:
-            QMessageBox.warning(self, "删除失败", f"无法删除文件: {str(e)}")
+            warning(self, "删除失败", f"无法删除文件: {str(e)}")
     
-    self.changeFontSize(self.statusBarWidget.currentFontSize) 
+    # 移除不必要的字体大小重置，避免可能的错误
+    # self.changeFontSize(self.statusBarWidget.currentFontSize) 

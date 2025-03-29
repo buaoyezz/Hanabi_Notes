@@ -17,12 +17,15 @@ class Theme:
             else:
                 return default
         return value
+    
+    def should_preserve_font_size(self):
+        return self.get('editor.preserve_font_size', False)
 
 class ThemeManager:
     def __init__(self):
         self.themes = {}
         self.current_theme = None
-        self.current_theme_name = None
+        self.current_theme_name = "dark"  # 默认主题
         self.default_theme_name = "dark"
         self._initialize_default_themes()
         
@@ -48,7 +51,8 @@ class ThemeManager:
                 "selection_color": "#404eff",
                 "cursor_color": "white",
                 "line_height": "1.5",
-                "border_color": "#1e2128"
+                "border_color": "#1e2128",
+                "preserve_font_size": True
             },
             "scrollbar": {
                 "background": "transparent",
@@ -61,13 +65,15 @@ class ThemeManager:
                 "background": "#1a1d23",
                 "text_color": "white",
                 "icon_color": "rgba(255, 255, 255, 0.7)",
-                "active_icon_color": "#6b9fff"
+                "active_icon_color": "#6b9fff",
+                "hover_bg": "rgba(255, 255, 255, 0.1)",
+                "line_count_bg": "rgba(0, 0, 0, 0.2)"
             },
             "sidebar": {
                 "background": "#252932",
                 "text_color": "white",
                 "active_tab_bg": "#2f3440",
-                "hover_tab_bg": "rgba(255, 255, 255, 0.1)",
+                "hover_tab_bg": "rgba(255, 255, 255, 0.08)",
                 "icon_color": "rgba(255, 255, 255, 0.7)"
             },
             "preview": {
@@ -285,42 +291,110 @@ class ThemeManager:
     
     def get_status_bar_style(self):
         if not self.current_theme:
-            return ""
+            return ("background-color: #1a1d23; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;",
+                   "color: rgba(255, 255, 255, 0.7); hover { background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }",
+                   "color: #6b9fff; hover { background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }")
         
+        # 获取样式属性
         bg = self.current_theme.get("status_bar.background", "#1a1d23")
         text_color = self.current_theme.get("status_bar.text_color", "white")
         icon_color = self.current_theme.get("status_bar.icon_color", "rgba(255, 255, 255, 0.7)")
         active_icon = self.current_theme.get("status_bar.active_icon_color", "#6b9fff")
+        hover_bg = self.current_theme.get("status_bar.hover_bg", "rgba(255, 255, 255, 0.1)")
+        line_count_bg = self.current_theme.get("status_bar.line_count_bg", "rgba(0, 0, 0, 0.2)")
         
-        return (f"""
-            background-color: {bg}; 
-            border-bottom-left-radius: 10px; 
-            border-bottom-right-radius: 10px;
-            color: {text_color};
-        """, 
-        f"color: {icon_color}; hover {{ background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }}",
-        f"color: {active_icon}; hover {{ background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; }}")
+        # 优先使用主题中定义的完整样式
+        status_style = self.current_theme.get("status_bar.style")
+        if not status_style:
+            # 如果没有定义完整样式，则使用单独的属性生成样式
+            status_style = f"""
+                background-color: {bg}; 
+                border-bottom-left-radius: 10px; 
+                border-bottom-right-radius: 10px;
+                color: {text_color};
+            """
+        
+        # 优先使用主题中定义的图标样式
+        icon_style = self.current_theme.get("status_bar.icon")
+        if not icon_style:
+            # 如果没有定义图标样式，则使用单独的属性生成样式
+            icon_style = f"""
+                color: {icon_color}; 
+                background-color: transparent;
+                border: none;
+                border-radius: 8px;
+                padding: 4px;
+            """
+            icon_style += f"""
+                :hover {{
+                    background-color: {hover_bg};
+                }}
+            """
+        
+        # 优先使用主题中定义的活动图标样式
+        active_icon_style = self.current_theme.get("status_bar.active_icon")
+        if not active_icon_style:
+            # 如果没有定义活动图标样式，则使用单独的属性生成样式
+            active_icon_style = f"""
+                color: {active_icon}; 
+                background-color: transparent;
+                border: none;
+                border-radius: 8px;
+                padding: 4px;
+            """
+            active_icon_style += f"""
+                :hover {{
+                    background-color: {hover_bg};
+                }}
+            """
+        
+        return (status_style, icon_style, active_icon_style)
     
     def get_sidebar_style(self):
         if not self.current_theme:
-            return ""
+            return (
+                "background-color: #1a1d23; color: #e0e5ec;",
+                "background-color: #2f3440;",
+                "background-color: rgba(255, 255, 255, 0.02);",  # 降低默认透明度
+                "color: rgba(224, 229, 236, 0.7);"
+            )
         
-        bg = self.current_theme.get("sidebar.background", "#1a1d23")
-        text_color = self.current_theme.get("sidebar.text_color", "#e0e5ec")
-        active_tab = self.current_theme.get("sidebar.active_tab_bg", "#2f3440")
-        hover_tab = self.current_theme.get("sidebar.hover_tab_bg", "rgba(255, 255, 255, 0.1)")
+        # 优先使用主题中定义的侧边栏样式
+        sidebar_style = self.current_theme.get("sidebar.style")
+        if not sidebar_style:
+            # 如果没有定义侧边栏样式，则使用单独的属性生成样式
+            bg = self.current_theme.get("sidebar.background", "#1a1d23")
+            text_color = self.current_theme.get("sidebar.text_color", "#e0e5ec")
+            border_color = self.current_theme.get("sidebar.border_color", "#2d2d2d")
+            sidebar_style = f"""
+                background-color: {bg};
+                color: {text_color};
+                border-right: 1px solid {border_color};
+            """
+        
+        # 活动标签页样式
+        active_tab_bg = self.current_theme.get("sidebar.active_tab_bg", "#2f3440")
+        active_tab_style = f"background-color: {active_tab_bg};"
+        
+        # 悬停标签页样式 - 非常低的透明度
+        hover_tab_bg = self.current_theme.get("sidebar.hover_tab_bg", "rgba(255, 255, 255, 0.02)")
+        
+        # 确保hover_tab_bg的透明度很低
+        if "rgba(" in hover_tab_bg:
+            parts = hover_tab_bg.replace("rgba(", "").replace(")", "").split(",")
+            if len(parts) == 4:
+                r, g, b = parts[0].strip(), parts[1].strip(), parts[2].strip()
+                alpha = float(parts[3].strip())
+                if alpha > 0.05:  # 如果透明度大于0.05，降低到0.02
+                    hover_tab_bg = f"rgba({r}, {g}, {b}, 0.02)"
+        
+        hover_tab_style = f"background-color: {hover_tab_bg};"
+        
+        # 图标颜色样式
         icon_color = self.current_theme.get("sidebar.icon_color", "rgba(224, 229, 236, 0.7)")
+        icon_style = f"color: {icon_color};"
         
-        return f"""
-            background-color: {bg};
-            color: {text_color};
-        """, f"""
-            background-color: {active_tab};
-        """, f"""
-            background-color: {hover_tab};
-        """, f"""
-            color: {icon_color};
-        """
+        return (sidebar_style, active_tab_style, hover_tab_style, icon_style)
     
     def get_preview_styles(self):
         if not self.current_theme:
@@ -415,7 +489,6 @@ class ThemeManager:
             blockquote_border = self.current_theme.get("preview.blockquote_border", "#3b434b")
             table_border = self.current_theme.get("preview.table_border", "#30363d")
             
-            # 预览容器不需要边框，将由容器设置
             return f"""
                 background-color: {bg}; 
                 border: none;
@@ -502,3 +575,16 @@ class ThemeManager:
         flash_color = parse_rgba(flash_color_str)
         
         return line_color, flash_color
+
+    def get_editor_font_settings(self):
+        """获取编辑器字体设置"""
+        if not self.current_theme:
+            return {
+                "preserve_font_size": False
+            }
+            
+        preserve_font_size = self.current_theme.should_preserve_font_size()
+            
+        return {
+            "preserve_font_size": preserve_font_size
+        }

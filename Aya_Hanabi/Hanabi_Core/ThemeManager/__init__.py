@@ -71,7 +71,7 @@ class ThemeManager:
                 
         return f"""
             background-color: {bg_color};
-            border: 1px solid {border_color};
+            border: none;
             border-radius: {border_radius};
         """
         

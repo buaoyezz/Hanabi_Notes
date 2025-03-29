@@ -20,24 +20,22 @@ class ButtonHoverAnimation(QObject):
         if self.animation and self.animation.state() == QPropertyAnimation.Running:
             self.animation.stop()
         
-        if not self.disable_transparency:
-            self.animation = QPropertyAnimation(self.button, b"windowOpacity")
-            self.animation.setDuration(200)
-            self.animation.setStartValue(self.button.windowOpacity())
-            self.animation.setEndValue(1.0)
-            self.animation.setEasingCurve(QEasingCurve.OutCubic)
-            self.animation.start()
-        else:
-            current_color = self.button.palette().color(QPalette.Button)
-            target_color = QColor(0, 103, 163)
-            
-            updated_style = self.button.styleSheet().replace(
-                "background-color: #005780", 
-                "background-color: #0067a3"
-            )
-            self.button.setStyleSheet(updated_style)
-            
-            self.button.updateStyle(True)
+        # 检查是否为暗色主题按钮，如果是，使用较弱的hover效果
+        is_dark_theme = False
+        themeManager = None
+        
+        if hasattr(self.button, 'parent') and self.button.parent():
+            parent = self.button.parent()
+            while parent:
+                if hasattr(parent, 'themeManager'):
+                    themeManager = parent.themeManager
+                    if hasattr(themeManager, 'current_theme_name'):
+                        theme_name = themeManager.current_theme_name
+                        is_dark_theme = theme_name in ["dark", "purple_dream", "green_theme"]
+                    break
+                parent = parent.parent()
+                
+        self.button.updateStyle(True, themeManager)
     
     def leaveEvent(self):
         self.is_hovered = False
@@ -45,21 +43,14 @@ class ButtonHoverAnimation(QObject):
         if self.animation and self.animation.state() == QPropertyAnimation.Running:
             self.animation.stop()
         
-        if not self.disable_transparency:
-            self.animation = QPropertyAnimation(self.button, b"windowOpacity")
-            self.animation.setDuration(300)
-            self.animation.setStartValue(self.button.windowOpacity())
-            self.animation.setEndValue(0.8)
-            self.animation.setEasingCurve(QEasingCurve.OutCubic)
-            self.animation.start()
-        else:
-            current_color = self.button.palette().color(QPalette.Button)
-            target_color = QColor(0, 87, 128)
-            
-            updated_style = self.button.styleSheet().replace(
-                "background-color: #0067a3", 
-                "background-color: #005780"
-            )
-            self.button.setStyleSheet(updated_style)
-            
-            self.button.updateStyle(False) 
+        # 检查是否为暗色主题按钮
+        themeManager = None
+        if hasattr(self.button, 'parent') and self.button.parent():
+            parent = self.button.parent()
+            while parent:
+                if hasattr(parent, 'themeManager'):
+                    themeManager = parent.themeManager
+                    break
+                parent = parent.parent()
+                
+        self.button.updateStyle(False, themeManager) 

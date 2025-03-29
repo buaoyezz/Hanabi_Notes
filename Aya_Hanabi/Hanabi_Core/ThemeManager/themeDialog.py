@@ -1,10 +1,17 @@
+import os
+import json
+import shutil
+from pathlib import Path
+
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, 
                                QPushButton, QLabel, QTabWidget, QWidget, QColorDialog,
-                               QScrollArea, QFormLayout, QGroupBox, QMessageBox, QLineEdit)
+                               QScrollArea, QFormLayout, QGroupBox, QMessageBox, QLineEdit,
+                               QFileDialog, QTextEdit, QCheckBox, QGridLayout)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 
 from .themeManager import ThemeManager, Theme
+from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
 
 class ColorPickerButton(QPushButton):
     colorChanged = Signal(QColor)
@@ -396,12 +403,12 @@ class ThemeSettingsDialog(QDialog):
     def createCustomTheme(self):
         theme_name = self.newThemeNameEdit.text().strip()
         if not theme_name:
-            QMessageBox.warning(self, "无效名称", "请输入有效的主题名称")
+            warning(self, "无效名称", "请输入有效的主题名称")
             return
             
         # 检查名称是否已存在
         if theme_name in [theme[0] for theme in self.themes]:
-            QMessageBox.warning(self, "名称冲突", f"已存在名为 '{theme_name}' 的主题")
+            warning(self, "名称冲突", f"已存在名为 '{theme_name}' 的主题")
             return
             
         # 从当前主题创建自定义数据
@@ -439,9 +446,9 @@ class ThemeSettingsDialog(QDialog):
             # 选择新主题
             self.themeComboBox.setCurrentIndex(self.themeComboBox.count() - 1)
             
-            QMessageBox.information(self, "成功", f"已创建新主题 '{theme_name}'")
+            information(self, "成功", f"已创建新主题 '{theme_name}'")
         else:
-            QMessageBox.warning(self, "错误", "创建主题失败")
+            warning(self, "错误", "创建主题失败")
             
     def applyTheme(self):
         """应用选中的主题"""
@@ -564,7 +571,7 @@ class ThemePreviewWidget(QWidget):
         self.previewWindow.setStyleSheet(f"""
             #previewWindow {{
                 background-color: {windowBg};
-                border: 1px solid {windowBorder};
+                border: none;
                 border-radius: {windowRadius};
             }}
         """)

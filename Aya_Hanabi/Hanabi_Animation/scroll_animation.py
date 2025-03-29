@@ -280,8 +280,26 @@ class ButtonHoverAnimation(QObject):
     background_opacity = Property(float, get_background_opacity, set_background_opacity)
     
     def update_style(self):
+        # 检查是否为暗色主题按钮
+        is_dark_theme = False
+        if hasattr(self.button, 'parent') and self.button.parent():
+            parent = self.button.parent()
+            while parent:
+                if hasattr(parent, 'themeManager') and parent.themeManager:
+                    if hasattr(parent.themeManager, 'current_theme_name'):
+                        theme_name = parent.themeManager.current_theme_name
+                        is_dark_theme = theme_name in ["dark", "purple_dream", "green_theme"]
+                    break
+                parent = parent.parent()
+        
+        # 根据主题类型使用不同的透明度处理
         bg_opacity = self._background_opacity
-        bg_color = f"rgba(255, 255, 255, {bg_opacity * 0.15})"
+        if is_dark_theme:
+            # 暗色主题时降低动画效果透明度
+            bg_opacity = bg_opacity * 0.05
+            bg_color = f"rgba(255, 255, 255, {bg_opacity})"
+        else:
+            bg_color = f"rgba(255, 255, 255, {bg_opacity * 0.15})"
         
         text_opacity = min(1.0, self._hover_opacity)
         text_color = f"rgba(255, 255, 255, {text_opacity})"

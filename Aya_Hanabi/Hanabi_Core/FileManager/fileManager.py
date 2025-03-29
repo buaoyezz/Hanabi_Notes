@@ -2,6 +2,7 @@ import os
 import json
 from PySide6.QtCore import QObject, Signal, QSettings
 from PySide6.QtWidgets import QFileDialog, QMessageBox
+from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
 
 class FileManager(QObject):
     # 文件内容加载信号
@@ -46,7 +47,7 @@ class FileManager(QObject):
             return filePath, title, content
         except Exception as e:
             if parent:
-                QMessageBox.warning(parent, "打开失败", f"无法打开文件: {str(e)}")
+                warning(parent, "打开失败", f"无法打开文件: {str(e)}")
             return None, None, None
     
     def saveFile(self, content, defaultName="未命名", parent=None, title="保存文件", fileTypes="Markdown文件 (*.md);;所有文件 (*)"):
@@ -73,7 +74,7 @@ class FileManager(QObject):
             return filePath
         except Exception as e:
             if parent:
-                QMessageBox.warning(parent, "保存失败", f"无法保存文件: {str(e)}")
+                warning(parent, "保存失败", f"无法保存文件: {str(e)}")
             return None
     
     def readFile(self, filePath):
@@ -106,7 +107,7 @@ class FileManager(QObject):
         """
         if not filePath or not os.path.exists(filePath):
             if parent:
-                QMessageBox.warning(parent, "删除失败", "文件不存在")
+                warning(parent, "删除失败", "文件不存在")
             return False
         
         try:
@@ -115,5 +116,5 @@ class FileManager(QObject):
             return True
         except Exception as e:
             if parent:
-                QMessageBox.warning(parent, "删除失败", f"无法删除文件: {str(e)}")
+                warning(parent, "删除失败", f"无法删除文件: {str(e)}")
             return False 

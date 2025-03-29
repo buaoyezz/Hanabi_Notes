@@ -1,6 +1,7 @@
 import os
 import time
 import datetime
+import hashlib
 from PySide6.QtCore import QTimer
 
 class AutoSave:
@@ -14,6 +15,7 @@ class AutoSave:
         self.parent = parent
         self.interval = interval
         self.lastSaveTime = {}  # 记录每个文件最后保存时间
+        self.lastContentHash = {}  # 记录每个文件上次保存的内容哈希
         self.enabled = True
         self.timer = None
         
@@ -46,6 +48,10 @@ class AutoSave:
         self.interval = seconds
         print(f"自动保存间隔已设置为 {seconds} 秒")
     
+    def get_content_hash(self, content):
+        """计算内容的MD5哈希值，用于检测变化"""
+        return hashlib.md5(content.encode('utf-8')).hexdigest()
+    
     def check_files(self):
         """检查并保存需要自动保存的文件"""
         if not self.enabled or not self.parent:
@@ -70,12 +76,22 @@ class AutoSave:
                         editor = self.parent.editors[editor_index]
                         content = editor.toPlainText()
                         
+                        # 计算当前内容哈希
+                        current_hash = self.get_content_hash(content)
+                        
+                        # 如果内容未发生变化，跳过保存
+                        if file_path in self.lastContentHash and self.lastContentHash[file_path] == current_hash:
+                            # 虽然不保存，但更新时间记录，避免频繁检查
+                            self.lastSaveTime[file_path] = current_time
+                            continue
+                        
                         # 直接写入文件而不显示对话框
                         with open(file_path, 'w', encoding='utf-8') as f:
                             f.write(content)
                             
-                        # 更新最后保存时间
+                        # 更新最后保存时间和内容哈希
                         self.lastSaveTime[file_path] = current_time
+                        self.lastContentHash[file_path] = current_hash
                         
                         # 获取当前时间
                         now = datetime.datetime.now().strftime("%H:%M:%S")
@@ -84,6 +100,19 @@ class AutoSave:
                         print(f"自动保存文件时出错: {e}")
     
     def file_saved(self, file_path):
-        """手动保存文件后更新时间记录"""
+        """手动保存文件后更新时间记录和内容哈希"""
         if file_path:
             self.lastSaveTime[file_path] = time.time()
+            
+            # 更新内容哈希
+            try:
+                for file_info in self.parent.openFiles:
+                    if file_info.get('filePath') == file_path:
+                        editor_index = file_info.get('editorIndex')
+                        if 0 <= editor_index < len(self.parent.editors):
+                            editor = self.parent.editors[editor_index]
+                            content = editor.toPlainText()
+                            self.lastContentHash[file_path] = self.get_content_hash(content)
+                            break
+            except Exception as e:
+                print(f"更新内容哈希时出错: {e}")

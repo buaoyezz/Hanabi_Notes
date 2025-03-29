@@ -4,40 +4,57 @@
   "window": {
     "background": "#1a2e25",
     "border": "#2a3c33",
-    "radius": "10px"
+    "radius": "10px",
+    "style": "background-color: #1a2e25; border: 1px solid #2a3c33; border-radius: 10px;"
   },
   "title_bar": {
     "background": "#1a2e25",
     "text_color": "#e0efe8",
     "icon_bg": "#2a3c33",
-    "icon_color": "#6abf7c"
+    "icon_color": "#6abf7c",
+    "controls_color": "rgba(224, 239, 232, 0.8)",
+    "controls_hover": "rgba(224, 239, 232, 1.0)",
+    "button_hover_bg": "rgba(255, 255, 255, 0.1)",
+    "close_color": "rgba(224, 239, 232, 0.8)",
+    "close_hover": "#e81123"
   },
   "editor": {
     "background": "#1a2e25",
     "text_color": "#e0efe8",
     "selection_color": "#4a8c64",
     "cursor_color": "#e0efe8",
-    "line_height": "1.5"
+    "line_height": "1.5",
+    "border_color": "#2a3c33",
+    "style": "border: none; color: #e0efe8; background-color: #1a2e25; selection-background-color: #4a8c64; font-size: {font_size}px; line-height: 1.5;",
+    "preserve_font_size": true
   },
   "scrollbar": {
     "background": "transparent",
     "handle_color": "rgba(106, 191, 124, 0.3)",
     "handle_hover_color": "rgba(106, 191, 124, 0.5)",
     "width": "6px",
-    "radius": "3px"
+    "radius": "3px",
+    "style": "QScrollBar:vertical { background: transparent; width: 6px; margin: 0px; border-radius: 3px; } QScrollBar::handle:vertical { background-color: rgba(106, 191, 124, 0.3); min-height: 30px; border-radius: 3px; } QScrollBar::handle:vertical:hover { background-color: rgba(106, 191, 124, 0.5); } QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; } QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }"
   },
   "status_bar": {
     "background": "#152118",
     "text_color": "#e0efe8",
     "icon_color": "rgba(255, 255, 255, 0.7)",
-    "active_icon_color": "#6abf7c"
+    "active_icon_color": "#6abf7c",
+    "hover_bg": "rgba(255, 255, 255, 0.05)",
+    "line_count_bg": "rgba(0, 0, 0, 0.2)",
+    "style": "background-color: #152118; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;",
+    "icon": "color: rgba(255, 255, 255, 0.7); hover { background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; }",
+    "active_icon": "color: #6abf7c; hover { background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; }"
   },
   "sidebar": {
     "background": "#1d3328",
     "text_color": "#e0efe8",
     "active_tab_bg": "#2a3c33",
-    "hover_tab_bg": "rgba(255, 255, 255, 0.1)",
-    "icon_color": "rgba(255, 255, 255, 0.7)"
+    "hover_tab_bg": "rgba(255, 255, 255, 0.08)",
+    "icon_color": "rgba(255, 255, 255, 0.7)",
+    "border_color": "#2a3c33",
+    "style": "background-color: #1d3328; border-right: 1px solid #2a3c33;"
   },
   "preview": {
     "background": "#1a2e25",
@@ -47,7 +64,9 @@
     "code_bg": "rgba(42, 60, 51, 0.4)",
     "blockquote_color": "#a7c2b3",
     "blockquote_border": "#2a3c33",
-    "table_border": "#2a3c33"
+    "table_border": "#2a3c33",
+    "style": "background-color: #1a2e25; border: none; color: #e0efe8;",
+    "html_style": "<style>body {font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #e0efe8; background-color: #1a2e25; margin: 0; padding: 0 10px;} h1, h2, h3, h4, h5, h6 {color: #ffffff; margin-top: 24px; margin-bottom: 16px; font-weight: 600;} h1 {font-size: 2em; border-bottom: 1px solid #2a3c33; padding-bottom: 0.3em;} h2 {font-size: 1.5em; border-bottom: 1px solid #2a3c33; padding-bottom: 0.3em;} a {color: #6abf7c; text-decoration: none;} a:hover {text-decoration: underline;} code {font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; padding: 0.2em 0.4em; background-color: rgba(42, 60, 51, 0.4); border-radius: 3px;} pre {background-color: #152118; border-radius: 6px; padding: 16px; overflow: auto;} pre code {background-color: transparent; padding: 0;} blockquote {color: #a7c2b3; border-left: 3px solid #2a3c33; padding-left: 16px; margin-left: 0;} table {border-collapse: collapse; width: 100%; margin: 16px 0;} table th, table td {border: 1px solid #2a3c33; padding: 6px 13px;} table th {background-color: #152118;} hr {border: 1px solid #2a3c33;}</style>"
   },
   "highlight": {
     "line_color": "rgba(106, 191, 124, 0.3)",

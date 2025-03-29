@@ -1,0 +1,74 @@
+{
+    "name": "silvery_white",
+    "display_name": "银白",
+    "window": {
+      "background": "#e0e5ec",
+      "border": "#c8d0d8",
+      "radius": "10px",
+      "style": "background-color: #e0e5ec; border: 1px solid #c8d0d8; border-radius: 10px;"
+    },
+    "title_bar": {
+      "background": "#e0e5ec",
+      "text_color": "#333333",
+      "icon_bg": "#d1d9e6",
+      "icon_color": "#555555",
+      "controls_color": "rgba(51, 51, 51, 0.8)",
+      "controls_hover": "rgba(51, 51, 51, 1.0)",
+      "button_hover_bg": "rgba(0, 0, 0, 0.05)",
+      "close_color": "rgba(51, 51, 51, 0.8)",
+      "close_hover": "#e81123"
+    },
+    "editor": {
+      "background": "#ffffff",
+      "text_color": "#333333",
+      "selection_color": "#b3d4ff",
+      "cursor_color": "#333333",
+      "line_height": "1.5",
+      "border_color": "#d1d9e6",
+      "style": "border: none; color: #333333; background-color: #ffffff; selection-background-color: #b3d4ff; font-size: {font_size}px; line-height: 1.5;",
+      "preserve_font_size": true
+    },
+    "scrollbar": {
+      "background": "transparent",
+      "handle_color": "rgba(0, 0, 0, 0.2)",
+      "handle_hover_color": "rgba(0, 0, 0, 0.4)",
+      "width": "6px",
+      "radius": "3px",
+      "style": "QScrollBar:vertical { background: transparent; width: 6px; margin: 0px; border-radius: 3px; } QScrollBar::handle:vertical { background-color: rgba(0, 0, 0, 0.2); min-height: 30px; border-radius: 3px; } QScrollBar::handle:vertical:hover { background-color: rgba(0, 0, 0, 0.4); } QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; } QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }"
+    },
+    "status_bar": {
+      "background": "#d1d9e6",
+      "text_color": "#333333",
+      "icon_color": "rgba(51, 51, 51, 0.7)",
+      "active_icon_color": "#007acc",
+      "hover_bg": "rgba(0, 0, 0, 0.05)",
+      "line_count_bg": "rgba(0, 0, 0, 0.07)",
+      "style": "background-color: #d1d9e6; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;",
+      "icon": "color: rgba(51, 51, 51, 0.7); hover { color: rgba(51, 51, 51, 0.9); background-color: rgba(0, 0, 0, 0.05); border-radius: 8px; }",
+      "active_icon": "color: #007acc; hover { color: #007acc; background-color: rgba(0, 0, 0, 0.05); border-radius: 8px; }"
+    },
+    "sidebar": {
+      "background": "#e8edf2",
+      "text_color": "#333333",
+      "active_tab_bg": "#ffffff",
+      "hover_tab_bg": "rgba(0, 0, 0, 0.05)",
+      "icon_color": "rgba(51, 51, 51, 0.7)",
+      "border_color": "#c8d0d8"
+    },
+    "preview": {
+      "background": "#ffffff",
+      "text_color": "#333333",
+      "heading_color": "#111111",
+      "link_color": "#007acc",
+      "code_bg": "rgba(0, 0, 0, 0.05)",
+      "blockquote_color": "#555555",
+      "blockquote_border": "#c8d0d8",
+      "table_border": "#c8d0d8",
+      "style": "background-color: #ffffff; border: none; color: #333333;",
+      "html_style": "<style>body {font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #ffffff; margin: 0; padding: 0 10px;} h1, h2, h3, h4, h5, h6 {color: #111111; margin-top: 24px; margin-bottom: 16px; font-weight: 600;} h1 {font-size: 2em; border-bottom: 1px solid #c8d0d8; padding-bottom: 0.3em;} h2 {font-size: 1.5em; border-bottom: 1px solid #c8d0d8; padding-bottom: 0.3em;} a {color: #007acc; text-decoration: none;} a:hover {text-decoration: underline;} code {font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; padding: 0.2em 0.4em; background-color: rgba(0, 0, 0, 0.05); border-radius: 3px;} pre {background-color: #f0f4f8; border-radius: 6px; padding: 16px; overflow: auto;} pre code {background-color: transparent; padding: 0;} blockquote {color: #555555; border-left: 3px solid #c8d0d8; padding-left: 16px; margin-left: 0;} table {border-collapse: collapse; width: 100%; margin: 16px 0;} table th, table td {border: 1px solid #c8d0d8; padding: 6px 13px;} table th {background-color: #f0f4f8;} hr {border: 1px solid #c8d0d8;}</style>"
+    },
+    "highlight": {
+      "line_color": "rgba(179, 212, 255, 0.5)",
+      "flash_color": "rgba(179, 212, 255, 0.8)"
+    }
+  }
