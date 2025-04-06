@@ -8,9 +8,9 @@ class PythonHighlighter(BaseHighlighter):
         super().__init__(document, is_light_theme)
     
     def _init_formats(self):
-        # 基于亮暗主题选择合适的颜色
+
         if self.is_light_theme:
-            # 亮色主题的颜色
+
             self.formats['keyword'] = self._create_format('#0000FF', bold=True)  # 蓝色关键字
             self.formats['string'] = self._create_format('#008000')  # 绿色字符串
             self.formats['comment'] = self._create_format('#808080', italic=True)  # 灰色注释
@@ -40,7 +40,7 @@ class PythonHighlighter(BaseHighlighter):
                 'try', 'while', 'with', 'yield'
             ]
             
-            # 内置函数
+
             builtins = [
                 'abs', 'all', 'any', 'bin', 'bool', 'bytearray', 'bytes', 'callable',
                 'chr', 'classmethod', 'compile', 'complex', 'delattr', 'dict', 'dir',
@@ -86,7 +86,7 @@ class PythonHighlighter(BaseHighlighter):
             except Exception:
                 pass
                 
-            # 双引号字符串
+
             try:
                 string_re = re.compile(r'"[^"\n]*"')
                 for match in string_re.finditer(text):
@@ -96,7 +96,7 @@ class PythonHighlighter(BaseHighlighter):
             except Exception:
                 pass
             
-            # 三引号字符串 (多行)
+
             try:
                 triple_single = re.compile(r"'''.*?'''", re.DOTALL)
                 for match in triple_single.finditer(text):
@@ -115,7 +115,7 @@ class PythonHighlighter(BaseHighlighter):
             except Exception:
                 pass
             
-            # 注释高亮
+
             try:
                 comment_re = re.compile(r'#.*$')
                 match = comment_re.search(text)
@@ -126,7 +126,7 @@ class PythonHighlighter(BaseHighlighter):
             except Exception:
                 pass
             
-            # 数字高亮
+
             try:
                 number_re = re.compile(r'\b[0-9]+\b')
                 for match in number_re.finditer(text):
@@ -136,7 +136,7 @@ class PythonHighlighter(BaseHighlighter):
             except Exception:
                 pass
             
-            # 函数调用高亮
+
             try:
                 function_re = re.compile(r'\b[A-Za-z_][A-Za-z0-9_]*(?=\s*\()')
                 for match in function_re.finditer(text):
@@ -154,14 +154,14 @@ class PythonHighlighter(BaseHighlighter):
                 class_re = re.compile(r'(?:^|\s)class\s+([A-Za-z_][A-Za-z0-9_]*)')
                 for match in class_re.finditer(text):
                     if len(match.groups()) > 0:
-                        # 获取第一个捕获组(类名)
+
                         start = match.start(1)
                         length = match.end(1) - start
                         self.setFormat(start, length, self.formats['class'])
             except Exception:
                 pass
             
-            # 装饰器高亮
+
             try:
                 decorator_re = re.compile(r'@[A-Za-z_][A-Za-z0-9_]*')
                 for match in decorator_re.finditer(text):

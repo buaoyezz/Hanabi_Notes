@@ -2,8 +2,8 @@ import sys
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QApplication, QGraphicsDropShadowEffect,
                              QSpacerItem, QSizePolicy)
-from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize, Property, Signal, QRect
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QFont, QIcon
+from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QSize, Property, Signal, QRect, QPoint
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QFont, QIcon, QCursor
 from Aya_Hanabi.Hanabi_Core.FontManager.fontManager import FontManager, IconProvider, ICONS
 
 class HanabiMessageBox(QDialog):
@@ -44,6 +44,9 @@ class HanabiMessageBox(QDialog):
         
         self.font_family = self.get_font_family(parent)
         
+        # 颜色配置 - 将从主题中加载
+        self.theme_colors = self.get_theme_colors(parent)
+        
         self.color_scheme = {
             self.Information: {"icon": "info", "color": QColor(33, 150, 243)},
             self.Warning: {"icon": "warning", "color": QColor(255, 152, 0)},
@@ -58,8 +61,54 @@ class HanabiMessageBox(QDialog):
         
         self.setup_animations()
         
+        # 初始化拖动状态变量
         self.dragging = False
         self.drag_position = None
+    
+    def get_theme_colors(self, parent):
+        """从父窗口或应用程序设置中获取主题颜色"""
+        # 默认颜色配置
+        theme_colors = {
+            "background": "#ffffff",
+            "text": "#212121",
+            "secondary_text": "#757575",
+            "dialog_background": "#ffffff",
+            "dialog_text": "#212121",
+            "dialog_border": "#e0e0e0"
+        }
+        
+        # 尝试从父窗口获取主题
+        if parent and hasattr(parent, 'themeManager') and parent.themeManager:
+            if hasattr(parent.themeManager, 'current_theme'):
+                # 获取当前主题颜色
+                theme = parent.themeManager.current_theme
+                is_dark = False
+                
+                if hasattr(parent.themeManager, 'current_theme_name'):
+                    is_dark = parent.themeManager.current_theme_name in ["dark", "purple_dream", "green_theme"]
+                
+                if is_dark:
+                    # 暗色主题
+                    theme_colors = {
+                        "background": theme.get("editor.bg_color", "#1e1e1e"),
+                        "text": theme.get("editor.text_color", "#f3f3f3"),
+                        "secondary_text": theme.get("editor.comment_color", "#a0a0a0"),
+                        "dialog_background": theme.get("app.bg_color", "#2d2d30"),
+                        "dialog_text": theme.get("app.text_color", "#f3f3f3"),
+                        "dialog_border": theme.get("app.border_color", "#3f3f46")
+                    }
+                else:
+                    # 亮色主题
+                    theme_colors = {
+                        "background": theme.get("editor.bg_color", "#ffffff"),
+                        "text": theme.get("editor.text_color", "#212121"),
+                        "secondary_text": theme.get("editor.comment_color", "#757575"),
+                        "dialog_background": theme.get("app.bg_color", "#ffffff"),
+                        "dialog_text": theme.get("app.text_color", "#212121"),
+                        "dialog_border": theme.get("app.border_color", "#e0e0e0")
+                    }
+        
+        return theme_colors
     
     def get_font_family(self, parent):
         font_family = "Microsoft YaHei"
@@ -124,18 +173,18 @@ class HanabiMessageBox(QDialog):
         icon_font = IconProvider.get_icon_font(16)
         self.close_button.setFont(icon_font)
         self.close_button.setText(IconProvider.get_icon("close"))
-        self.close_button.setStyleSheet("""
-            QPushButton {
+        self.close_button.setStyleSheet(f"""
+            QPushButton {{
                 border: none;
-                color: #757575;
+                color: {self.theme_colors['secondary_text']};
                 background-color: transparent;
-            }
-            QPushButton:hover {
-                color: #212121;
-            }
-            QPushButton:pressed {
-                color: #757575;
-            }
+            }}
+            QPushButton:hover {{
+                color: {self.theme_colors['text']};
+            }}
+            QPushButton:pressed {{
+                color: {self.theme_colors['secondary_text']};
+            }}
         """)
         self.close_button.setFixedSize(30, 30)
         self.close_button.clicked.connect(self.reject)
@@ -153,8 +202,8 @@ class HanabiMessageBox(QDialog):
         self.text_label.setFont(content_font)
         self.text_label.setWordWrap(True)
         self.text_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.text_label.setStyleSheet("""
-            color: #212121;
+        self.text_label.setStyleSheet(f"""
+            color: {self.theme_colors['text']};
             margin: 10px 5px;
         """)
         main_layout.addWidget(self.text_label)
@@ -269,21 +318,43 @@ class HanabiMessageBox(QDialog):
     def showEvent(self, event):
         super().showEvent(event)
         
+        # 计算对话框在屏幕上的位置
+        center_point = QPoint()
+        
+        # 优先使用父窗口中心点
         if self.parent():
             parent_rect = self.parent().geometry()
-            x = parent_rect.x() + (parent_rect.width() - self.width()) // 2
-            y = parent_rect.y() + (parent_rect.height() - self.height()) // 2
+            center_point = parent_rect.center()
         else:
-            desktop = QApplication.desktop()
-            screen_rect = desktop.screenGeometry()
-            x = (screen_rect.width() - self.width()) // 2
-            y = (screen_rect.height() - self.height()) // 2
+            # 如果没有父窗口，则使用当前屏幕的中心点
+            center_point = QCursor.pos()
+            # 如果鼠标位置不可靠，则使用屏幕中心
+            if center_point.x() == 0 and center_point.y() == 0:
+                screen = QApplication.primaryScreen().geometry()
+                center_point = screen.center()
+        
+        # 根据对话框大小计算左上角位置
+        x = center_point.x() - self.width() // 2
+        y = center_point.y() - self.height() // 2
+        
+        # 确保对话框在屏幕内
+        screen = QApplication.primaryScreen().geometry()
+        if x < screen.left():
+            x = screen.left() + 10
+        elif x + self.width() > screen.right():
+            x = screen.right() - self.width() - 10
+            
+        if y < screen.top():
+            y = screen.top() + 10
+        elif y + self.height() > screen.bottom():
+            y = screen.bottom() - self.height() - 10
         
         self.move(x, y)
         
+        # 启动动画
         self.animation.start()
         
-        start_rect = QRect(x + self.width() // 2 - 10, y + self.height() // 2 - 10, 20, 20)
+        start_rect = QRect(center_point.x() - 10, center_point.y() - 10, 20, 20)
         end_rect = QRect(x, y, self.width(), self.height())
         
         self.scale_animation.setStartValue(start_rect)
@@ -298,8 +369,32 @@ class HanabiMessageBox(QDialog):
         path.addRoundedRect(0, 0, self.width(), self.height(), 10, 10)
         
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(255, 255, 255))
+        painter.setBrush(QColor(self.theme_colors['dialog_background']))
         painter.drawPath(path)
+    
+    # 添加鼠标事件处理以支持拖动
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            # 检查鼠标是否点击了对话框的标题区域（上边缘30像素范围）
+            if event.position().y() <= 30:
+                self.dragging = True
+                self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
+        
+        super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.LeftButton and self.dragging:
+            self.move(event.globalPosition().toPoint() - self.drag_position)
+            event.accept()
+        
+        super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.dragging = False
+        
+        super().mouseReleaseEvent(event)
     
     def handle_ok(self):
         self.result_value = self.Ok_Result

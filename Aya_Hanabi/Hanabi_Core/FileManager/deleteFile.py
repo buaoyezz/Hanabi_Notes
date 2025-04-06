@@ -24,7 +24,7 @@ def delete_file(self):
             # 使用FileManager来删除文件
             success = self.fileManager.deleteFile(filePath, self)
             if success:
-                self.sidebar.closeTab(self.sidebar.activeTabIndex)
+                self.sidebar.closeTab(self.sidebar.current_tab_index)
                 information(self, "删除成功", "文件已成功删除。")
         except Exception as e:
             warning(self, "删除失败", f"无法删除文件: {str(e)}")

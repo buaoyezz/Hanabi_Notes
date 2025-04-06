@@ -90,14 +90,15 @@ class TitleBar(QWidget):
             
             # 获取当前主题名
             theme_name = ""
-            if hasattr(themeManager.current_theme, 'name'):
-                theme_name = themeManager.current_theme.name
+            if hasattr(themeManager, 'current_theme') and themeManager.current_theme:
+                if hasattr(themeManager.current_theme, 'name'):
+                    theme_name = themeManager.current_theme.name
             
             # 应用标题栏样式但不覆盖布局相关属性
             self.setStyleSheet(title_style)
             
             # 获取主题颜色
-            if themeManager.current_theme:
+            if hasattr(themeManager, 'current_theme') and themeManager.current_theme:
                 # 亮色主题特殊处理
                 if theme_name == "light":
                     bg_color = "#f5f5f5"  # 确保亮色主题使用浅色背景

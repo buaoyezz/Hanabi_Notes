@@ -86,7 +86,7 @@ class EditorWidget(QPlainTextEdit):
     
     def setSyntaxHighlightFromName(self, highlightName):
         """根据名称设置语法高亮"""
-        from Aya_Hanabi.Hanabi_Core.Highlighter.highlightManager import getHighlighter
+        from Aya_Hanabi.Hanabi_HighLight import get_highlighter
         
         try:
             # 如果已有高亮器，先移除它
@@ -94,7 +94,7 @@ class EditorWidget(QPlainTextEdit):
                 self.highlighter.setDocument(None)
             
             # 获取并应用新的高亮器
-            self.highlighter = getHighlighter(highlightName)
+            self.highlighter = get_highlighter(highlightName)
             if self.highlighter:
                 self.highlighter.setDocument(self.document())
                 print(f"已设置{highlightName}语法高亮")

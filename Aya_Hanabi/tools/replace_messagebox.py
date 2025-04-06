@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 # -*- coding: utf-8 -*-
 
 import os
@@ -10,7 +10,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir))
 sys.path.insert(0, project_root)
 
-# 导入替换器模块
+
 from Aya_Hanabi.Hanabi_Core.UI.messageBoxReplacer import replace_qmessagebox_in_directory
 from Aya_Hanabi.Hanabi_Core.UI.messageBox import AndroidStyleMessageBox, information, warning, critical, question, success
 

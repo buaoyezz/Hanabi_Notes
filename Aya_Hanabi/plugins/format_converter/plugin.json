@@ -1,0 +1,8 @@
+{
+    "name": "格式转换工具",
+    "version": "1.0.0",
+    "description": "支持各种文件格式的转换，包括Markdown到HTML等",
+    "author": "Hanabi Team",
+    "min_app_version": "1.0.0",
+    "icon": null
+} 

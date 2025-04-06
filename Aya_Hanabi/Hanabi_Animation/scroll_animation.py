@@ -28,11 +28,13 @@ class ScrollFadeAnimation(QObject):
     
     def update_style(self):
         from Aya_Hanabi.Hanabi_Styles.scrollbar_style import ScrollBarStyle
-        handle_color = f"rgba(255, 255, 255, {self._opacity})"
+        # 确保滚动条始终有一定的可见度，最小不透明度为0.3
+        opacity = max(0.3, self._opacity)
+        handle_color = f"rgba(255, 255, 255, {opacity})"
         
-        # 直接应用滚动条样式，不尝试保留原始样式
+        # 直接应用滚动条样式，使用 get_style 方法获取样式表字符串
         style = ScrollBarStyle.get_style(base_color="transparent", handle_color=handle_color)
-        self.widget.setStyleSheet(style)
+        self.widget.verticalScrollBar().setStyleSheet(style)
     
     def start_show_animation(self):
         self.hide_timer.stop()
@@ -56,6 +58,13 @@ class ScrollFadeAnimation(QObject):
     def show_temporarily(self):
         self.start_show_animation()
         self.hide_timer.start(1800)
+        
+    def cleanup(self):
+        if self.animation.state() == QAbstractAnimation.Running:
+            self.animation.stop()
+        
+        if self.hide_timer.isActive():
+            self.hide_timer.stop()
 
 class ScrollAnimation:
     @staticmethod

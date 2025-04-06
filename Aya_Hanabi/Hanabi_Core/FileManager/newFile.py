@@ -35,6 +35,24 @@ def new_file(self):
     self.setWindowTitle("Hanabi Notes - 未命名")
     self.updateLineCount(self.editors[editorIndex])
     
+    # 确保将主题样式应用到新创建的编辑器区域
+    if hasattr(self, 'editorsStack') and self.editorsStack.count() > 0:
+        stackWidget = self.editorsStack.widget(editorIndex)
+        if stackWidget and hasattr(self, 'themeManager') and self.themeManager:
+            print("为新标签页应用主题样式")
+            # 检查堆栈控件的子控件
+            for i in range(stackWidget.count()):
+                container = stackWidget.widget(i)
+                if container:
+                    self.updateEditorContainerStyle(container)
+            
+            # 确保编辑器样式更新
+            if 0 <= editorIndex < len(self.editors):
+                fontSize = 15
+                if hasattr(self, 'statusBarWidget') and hasattr(self.statusBarWidget, 'currentFontSize'):
+                    fontSize = self.statusBarWidget.currentFontSize
+                self.updateEditorStyle(self.editors[editorIndex], fontSize)
+    
     print(f"新建虚拟标签页完成，索引: {index}, 编辑器索引: {editorIndex}")
     
     # 强制处理事件以确保UI更新

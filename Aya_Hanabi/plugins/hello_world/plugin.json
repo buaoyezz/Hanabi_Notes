@@ -1,0 +1,8 @@
+{
+    "name": "Hello World",
+    "version": "1.0.0",
+    "description": "一个简单的Hello World示例插件",
+    "author": "Hanabi Team",
+    "min_app_version": "1.0.0",
+    "icon": null
+} 

@@ -1,7 +1,7 @@
 import os
 import json
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QPlainTextEdit
+from PySide6.QtWidgets import QPlainTextEdit, QWidget
 from PySide6.QtGui import QFont, QColor, QTextCursor, QTextFormat
 
 from Aya_Hanabi.Hanabi_HighLight import get_highlighter, detect_file_type
@@ -76,6 +76,10 @@ class EditorManager:
                         print(f"应用自定义字体: {custom_font}")
                         # 设置自定义字体，仍然保留后备字体
                         font_family = f"'{custom_font}', Consolas, 'Microsoft YaHei UI', '微软雅黑', monospace"
+                    
+                    # 下面会读取粗体和斜体设置
+                    is_bold = font_settings.get("bold", False)
+                    is_italic = font_settings.get("italic", False)
         except Exception as e:
             print(f"读取字体设置时出错: {e}")
             # 出错时使用默认字体
@@ -170,11 +174,21 @@ class EditorManager:
         font.setFamily(primary_font)
         font.setPointSize(fontSize)
 
-        # 检查是否有粗体和斜体设置
+        # 应用粗体和斜体设置
+        if 'is_bold' in locals():
+            font.setBold(is_bold)
+            print(f"应用粗体设置: {is_bold}")
+        
+        if 'is_italic' in locals():
+            font.setItalic(is_italic)
+            print(f"应用斜体设置: {is_italic}")
+        
+        # 下面的代码不再需要，因为我们已经从设置中读取了粗体和斜体信息
+        # 只保留为了兼容性，以防设置中没有这些属性
         try:
             settings_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
             settings_file = os.path.join(settings_dir, "settings.json")
-            if os.path.exists(settings_file):
+            if os.path.exists(settings_file) and 'is_bold' not in locals() and 'is_italic' not in locals():
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                 
@@ -182,8 +196,10 @@ class EditorManager:
                     font_settings = settings["editor"]["font"]
                     if "bold" in font_settings and font_settings["bold"]:
                         font.setBold(True)
+                        print("应用粗体设置")
                     if "italic" in font_settings and font_settings["italic"]:
                         font.setItalic(True)
+                        print("应用斜体设置")
         except Exception as e:
             print(f"读取字体样式设置时出错: {e}")
         
@@ -249,10 +265,34 @@ class EditorManager:
             QWidget {{
                 background-color: {bg_color};
                 border: none;
-                border-radius: 5px;
+            }}
+            QWidget#editorContainer, QWidget#previewContainer {{
+                background-color: {bg_color};
+                border: none;
+            }}
+            QPlainTextEdit {{
+                background-color: {bg_color};
+                border: none;
             }}
         """)
         
+        # 确保容器中的所有子部件也应用主题样式
+        for child in container.findChildren(QWidget):
+            # 通过设置对象名来用于样式表选择器
+            if not child.objectName() and isinstance(child, QPlainTextEdit):
+                child.setObjectName(f"editor_component_{id(child)}")
+            
+            # 对文本编辑器应用特殊样式
+            if isinstance(child, QPlainTextEdit):
+                # 获取当前字体大小
+                font_size = 15
+                if hasattr(self.app, 'statusBarWidget') and hasattr(self.app.statusBarWidget, 'currentFontSize'):
+                    font_size = self.app.statusBarWidget.currentFontSize
+                
+                # 更新编辑器样式
+                if hasattr(self, 'updateEditorStyle'):
+                    self.updateEditorStyle(child, font_size)
+    
     def applyHighlighter(self, editor, file_type=None):
         """应用语法高亮器到编辑器"""
         if hasattr(self.app, 'highlightMode') and not self.app.highlightMode:
@@ -264,6 +304,12 @@ class EditorManager:
         
         # 确定文件类型
         fileType = file_type or self.current_file_type
+        
+        # 如果传入了文件类型，更新当前文件类型
+        if file_type:
+            self.current_file_type = file_type
+            
+        print(f"应用高亮，文件类型: {fileType}")
         
         # 确定是否为亮色主题
         is_light_theme = False
@@ -388,6 +434,28 @@ class EditorManager:
         if not filePath:
             return "text"
             
+        # 获取编辑器设置
+        try:
+            settings_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
+            settings_file = os.path.join(settings_dir, "settings.json")
+            
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                    smart_detection = settings.get("editor", {}).get("editing", {}).get("smart_file_detection", False)
+                    
+                    # 如果启用智能检测，使用detect_file_type函数
+                    if smart_detection:
+                        from Aya_Hanabi.Hanabi_HighLight import detect_file_type
+                        return detect_file_type(filePath)
+            else:
+                # 如果设置文件不存在，默认启用智能检测
+                from Aya_Hanabi.Hanabi_HighLight import detect_file_type
+                return detect_file_type(filePath)
+        except Exception as e:
+            print(f"读取设置或智能检测失败: {e}")
+            
+        # 如果智能检测失败或未启用，使用后缀名判断
         suffix = os.path.splitext(filePath)[1].lower()
         file_type_map = {
             '.py': 'python',
@@ -417,4 +485,4 @@ class EditorManager:
         
         file_type = file_type_map.get(suffix, 'text')
         self.current_file_type = file_type
-        return file_type 
+        return file_type

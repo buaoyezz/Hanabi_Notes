@@ -1,0 +1,142 @@
+HanabiNotes -Project Structure Description
+Hanabi PSD [Project Structure Description]
+Author: ZZBUAOYE
+Team And Maker Group: Clut NetWork
+This file contains the project structure description for the Hanabi project.
+Help Dev To Change File
+=============================================
+
+
+1. 根目录
+   - .gitignore: Git版本控制忽略规则文件
+   - .vscode\settings.json: VS Code编辑器配置文件
+   - Aya_Hanabi\: 主项目代码目录
+   - Hanabi\: 字体和图标资源目录
+   - Hanabi_Notes.py: 项目笔记文件
+   - LICENSE: 项目许可证文件
+   - Launcher_Debug.py: 调试启动器
+   - README.md: 项目说明文档
+   - clean_pycache.py: 清理Python缓存脚本
+   - error_log.txt: 错误日志文件
+   - logs\hanabi_debug.log: 调试日志
+   - requirements.txt: Python依赖包列表
+   - test_theme.py: 主题测试文件
+   - update.txt: 更新日志
+
+2. Aya_Hanabi目录
+   2.1 Hanabi_Animation\: 动画效果管理模块
+     - __init__.py: 模块初始化文件
+     - animation_manager.py: 动画管理器
+     - button_animation.py: 按钮动画
+     - scroll_animation.py: 滚动动画
+     - sidebar_controller.py: 侧边栏控制器
+     - toolbar_animation.py: 工具栏动画
+
+   2.2 Hanabi_Core\: 核心功能模块
+     2.2.1 App\: 应用程序核心
+       - __init__.py: 模块初始化文件
+       - init.py: 应用初始化
+       - memoryManager.py: 内存管理
+       - optimizer.py: 性能优化
+       - startupAccelerator.py: 启动加速器
+
+     2.2.2 Editor\: 编辑器相关
+       - __init__.py: 模块初始化文件
+       - editorManager.py: 编辑器管理器
+       - editorWidget.py: 编辑器组件
+
+     2.2.3 FileManager\: 文件管理
+       - __init__.py: 模块初始化文件
+       - autoBackup.py: 自动备份
+       - autoSave.py: 自动保存
+       - changeFile.py: 文件切换
+       - closeFile.py: 关闭文件
+       - deleteFile.py: 删除文件
+       - fileManager.py: 文件管理器
+       - newFile.py: 新建文件
+       - openFile.py: 打开文件
+       - saveFile.py: 保存文件
+
+     2.2.4 FontManager\: 字体管理
+       - __init__.py: 模块初始化文件
+       - fontManager.py: 字体管理器
+       - FontPreviewDialog.py: 字体预览对话框
+       - IconSelectorDialog.py: 图标选择对话框
+
+     2.2.5 其他核心模块
+       - SidebarManager\: 侧边栏管理
+         - __init__.py: 模块初始化文件
+         - sidebarManager.py: 侧边栏管理器
+         - sidebarWidget.py: 侧边栏组件
+       - ThemeManager\: 主题管理
+         - __init__.py: 模块初始化文件
+         - themeManager.py: 主题管理器
+         - themeDialog.py: 主题对话框
+         - custom_themes\: 自定义主题目录
+           - green_theme.json: 绿色主题
+           - purple_dream.json: 紫色梦幻主题
+           - silvery_white.json: 银白主题
+         - themes\: 默认主题目录
+       - UI\: 用户界面组件
+         - __init__.py: 模块初始化文件
+         - HanabiDialog.py: 主对话框
+         - iconButton.py: 图标按钮
+         - messageBox.py: 消息框
+         - messageBoxReplacer.py: 消息框替换器
+         - statusBar.py: 状态栏
+         - titleBar.py: 标题栏
+
+   2.3 Hanabi_HighLight\: 语法高亮模块
+     - __init__.py: 模块初始化文件
+     - JSON\: JSON语法高亮
+       - __init__.py: 模块初始化文件
+       - json_highlighter.py: JSON高亮器
+     - MarkDown\: Markdown语法高亮
+       - __init__.py: 模块初始化文件
+       - markdown_highlighter.py: Markdown高亮器
+     - Python\: Python语法高亮
+       - __init__.py: 模块初始化文件
+       - python_highlighter.py: Python高亮器
+
+   2.4 Hanabi_Page\: 页面相关
+     - SettingsPages.py: 设置页面
+     - Settings\: 设置组件
+       - __init__.py: 模块初始化文件
+       - AboutSettings.py: 关于设置
+       - EditorSettings.py: 编辑器设置
+       - GeneralSettings.py: 常规设置
+       - SettingItem.py: 设置项
+       - SettingsSection.py: 设置区块
+       - SettingsWindow.py: 设置窗口
+       - StyleButton.py: 样式按钮
+       - ThemeSettings.py: 主题设置
+       - ToggleSwitch.py: 开关控件
+       - components\: 设置组件
+         - __init__.py: 模块初始化文件
+         - SettingItem.py: 设置项组件
+         - SettingsSection.py: 设置区块组件
+         - StyleButton.py: 样式按钮组件
+         - ThemePreviewWidget.py: 主题预览组件
+         - ToggleSwitch.py: 开关控件组件
+       - newSettingsPages.py: 新版设置页面
+
+   2.5 Hanabi_Styles\: 样式管理
+     - __init__.py: 模块初始化文件
+     - scrollbar_style.py: 滚动条样式
+
+   2.6 Hanabi_Tests\: 测试模块
+     - test_font_rendering.py: 字体渲染测试
+     
+   2.7 tools\: 工具模块
+     - replace_messagebox.py: 消息框替换工具
+
+3. Hanabi目录
+   - Fonts\: 字体资源
+     - MaterialIcons-Regular.ttf: Material图标字体
+     - codepoints: 图标代码点文件
+     - download_codepoints.py: 图标代码点下载脚本
+     - generate_icon_map.py: 图标映射生成脚本
+     - icon_map.py: 图标映射定义
+
+注：备份文件(.bak)和缓存目录(__pycache__)未在说明中列出
+提示: .bak 和 __pycache__都请勿上传Github .git 也不要

@@ -22,7 +22,7 @@ def download_codepoints():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
-        # 尝试所有链接
+
         for url in urls:
             try:
                 print(f"正在尝试从 {url} 下载...")
@@ -39,7 +39,7 @@ def download_codepoints():
             except Exception as e:
                 print(f"从 {url} 下载失败: {str(e)}")
                 print("尝试下一个链接...")
-                time.sleep(1)  # 等待一秒后重试
+                time.sleep(1)
                 continue
         
         raise Exception("所有下载链接都失败了")

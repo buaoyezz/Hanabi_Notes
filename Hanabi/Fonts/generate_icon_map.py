@@ -3,7 +3,7 @@ import json
 
 def generate_icon_map():
     try:
-        # codepoints 文件路径
+
         codepoints_path = os.path.join(
             os.path.dirname(__file__), 
             'icons', 
@@ -12,14 +12,14 @@ def generate_icon_map():
         
         icon_map = {}
         
-        # 读取并解析 codepoints 文件
+
         with open(codepoints_path, 'r', encoding='utf-8') as f:
             for line in f:
                 name, code = line.strip().split(' ')
                 # 转换十六进制到 Unicode 字符
                 icon_map[name] = chr(int(code, 16))
         
-        # 生成 Python 代码
+
         output_path = os.path.join(
             os.path.dirname(__file__),
             'icon_map.py'

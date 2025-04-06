@@ -9,7 +9,7 @@ class FontTestWindow(QMainWindow):
         self.setWindowTitle("字体渲染测试")
         self.setMinimumSize(600, 400)
         
-        # 创建中央窗口部件
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
@@ -18,7 +18,7 @@ class FontTestWindow(QMainWindow):
         
         # 测试的字体列表
         self.test_fonts = [
-            "STHupo",  # 华文琥珀
+            "STHupo",
             "华文琥珀",
             "SimHei",  # 黑体
             "Microsoft YaHei",  # 微软雅黑
@@ -26,12 +26,12 @@ class FontTestWindow(QMainWindow):
             "Arial"
         ]
         
-        # 测试文本
+
         self.test_text = "AaBbCcXxYyZz 1234567890 花火笔记，随你四季"
         
-        # 为每种字体创建标签
+
         for font_name in self.test_fonts:
-            # 标题标签
+
             title_label = QLabel(f"字体测试: {font_name}")
             layout.addWidget(title_label)
             
@@ -43,10 +43,7 @@ class FontTestWindow(QMainWindow):
             
             # 样式表方式设置字体
             css_label = QLabel(self.test_text)
-            css_label.setStyleSheet(f"""
-                font-family: "{font_name}";
-                font-size: 14pt;
-            """)
+            css_label.setStyleSheet(f)
             layout.addWidget(css_label)
             
             # 两种方式结合
@@ -63,7 +60,7 @@ class FontTestWindow(QMainWindow):
             separator.setStyleSheet("background-color: #333; min-height: 1px;")
             layout.addWidget(separator)
         
-        # 刷新按钮
+
         refresh_button = QPushButton("强制刷新")
         refresh_button.clicked.connect(self.force_refresh)
         layout.addWidget(refresh_button)
@@ -79,7 +76,7 @@ class FontTestWindow(QMainWindow):
                 widget.update()
                 widget.repaint()
         
-        # 强制处理事件
+
         QApplication.processEvents()
         print("已强制刷新所有字体标签")
 

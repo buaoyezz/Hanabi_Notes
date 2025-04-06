@@ -1,14 +1,18 @@
 import os
 import json
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QComboBox, QTabWidget, QWidget,
                              QListWidget, QListWidgetItem, QScrollArea,
                              QGridLayout, QFrame, QSizePolicy, QSpacerItem,
-                             QFileDialog, QMessageBox)
+                             QFileDialog, QMessageBox, QCheckBox, QGroupBox,
+                             QFormLayout, QSpinBox, QLineEdit, QFontComboBox,
+                             QColorDialog, QToolButton, QTextBrowser, QStackedWidget,
+                             QMenu)
 from PySide6.QtGui import QFont, QIcon, QPixmap, QImage, QColor, QFocusEvent
-from PySide6.QtWidgets import QApplication
 from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
+from Aya_Hanabi.Hanabi_Core.UI.HanabiDialog import HanabiDialog
+from Aya_Hanabi.Hanabi_Core.FontManager.fontManager import FontManager, IconProvider
 
 # 自定义无焦点组件基类
 class NoFocusWidget:
@@ -18,18 +22,6 @@ class NoFocusWidget:
         
     def setNoFocus(self):
         self.setFocusPolicy(Qt.NoFocus)
-
-# 无焦点列表组件
-class NoFocusListWidget(QListWidget, NoFocusWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setNoFocus()
-
-# 无焦点按钮
-class NoFocusButton(QPushButton, NoFocusWidget):
-    def __init__(self, text="", parent=None):
-        super().__init__(text, parent)
-        self.setNoFocus()
 
 # 基本设置对话框
 class SettingsDialog(QDialog):
@@ -42,6 +34,9 @@ class SettingsDialog(QDialog):
         self.setMinimumSize(800, 500)
         self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
         self.setFocusPolicy(Qt.NoFocus)
+        
+        # 获取主题颜色设置
+        self.theme_colors = self.get_theme_colors(parent)
         
         # 初始化设置
         self.settings = {
@@ -80,110 +75,142 @@ class SettingsDialog(QDialog):
         
         self.initUI()
         
+    def get_theme_colors(self, parent):
+        colors = {
+            "primary": "#8B5CF6",
+            "text": "#333333",
+            "background": "#FFFFFF",
+            "border": "#E5E7EB",
+            "hover": "rgba(0, 0, 0, 0.05)",
+            "is_dark": False,
+            "font_family": "Microsoft YaHei"
+        }
+        
+        if parent and hasattr(parent, 'themeManager') and parent.themeManager:
+            theme_manager = parent.themeManager
+            theme = getattr(theme_manager, 'current_theme', {})
+            
+            is_dark = False
+            if hasattr(theme_manager, 'current_theme_name'):
+                is_dark = theme_manager.current_theme_name in ["dark", "purple_dream", "green_theme"]
+            
+            colors["is_dark"] = is_dark
+            
+            if is_dark:
+                colors["primary"] = theme.get("accent_color", "#8B5CF6")
+                colors["text"] = theme.get("editor.text_color", "#E0E0E0")
+                colors["background"] = theme.get("window.background", "#1E2128")
+                colors["border"] = theme.get("window.border", "#333842")
+                colors["hover"] = "rgba(255, 255, 255, 0.05)"
+            else:
+                colors["primary"] = theme.get("accent_color", "#6B9FFF")
+                colors["text"] = theme.get("editor.text_color", "#333333")
+                colors["background"] = theme.get("window.background", "#FFFFFF")
+                colors["border"] = theme.get("window.border", "#E5E7EB")
+                colors["hover"] = "rgba(0, 0, 0, 0.05)"
+                
+            if hasattr(parent, 'font_family'):
+                colors["font_family"] = parent.font_family
+        
+        else:
+            try:
+                settings_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
+                settings_file = os.path.join(settings_dir, "settings.json")
+                
+                if os.path.exists(settings_file):
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        settings = json.load(f)
+                    
+                    theme_name = settings.get("appearance", {}).get("theme", "light")
+                    colors["is_dark"] = theme_name in ["dark", "purple_dream", "green_theme"]
+                    
+                    if colors["is_dark"]:
+                        colors["primary"] = "#8B5CF6"
+                        colors["text"] = "#E0E0E0"
+                        colors["background"] = "#1E2128"
+                        colors["border"] = "#333842"
+                        colors["hover"] = "rgba(255, 255, 255, 0.05)"
+                        
+                    if "editor" in settings and "font" in settings["editor"]:
+                        font_settings = settings["editor"]["font"]
+                        if "family" in font_settings:
+                            colors["font_family"] = font_settings["family"]
+            except Exception as e:
+                print(f"读取主题设置时出错: {e}")
+        
+        return colors
+        
     def initUI(self):
-        # 主布局
+        # 创建基本UI框架
         mainLayout = QVBoxLayout(self)
-        mainLayout.setContentsMargins(0, 0, 0, 0)
-        mainLayout.setSpacing(0)
-        
-        # 标题栏
-        titleBar = QWidget()
-        titleBar.setObjectName("titleBar")
-        titleBar.setFixedHeight(50)
-        titleBarLayout = QHBoxLayout(titleBar)
-        titleBarLayout.setContentsMargins(20, 0, 20, 0)
-        
-        titleLabel = QLabel("设置中心")
-        titleLabel.setObjectName("titleLabel")
-        titleLabel.setFont(QFont("", 16, QFont.Bold))
-        
-        titleBarLayout.addWidget(titleLabel)
-        
-        mainLayout.addWidget(titleBar)
+        mainLayout.setContentsMargins(10, 10, 10, 10)
         
         # 内容区域
         contentWidget = QWidget()
-        contentWidget.setObjectName("contentWidget")
         contentLayout = QHBoxLayout(contentWidget)
-        contentLayout.setContentsMargins(0, 0, 0, 0)
-        contentLayout.setSpacing(0)
         
         # 左侧导航栏
         navWidget = QWidget()
-        navWidget.setObjectName("navWidget")
-        navWidget.setFixedWidth(180)
+        navWidget.setFixedWidth(160)
         navLayout = QVBoxLayout(navWidget)
-        navLayout.setContentsMargins(15, 15, 0, 15)
-        navLayout.setSpacing(8)
+        navLayout.setContentsMargins(0, 0, 10, 0)
         
-        self.navListWidget = NoFocusListWidget()
-        self.navListWidget.setObjectName("navListWidget")
+        # 导航列表
+        self.navListWidget = QListWidget()
         self.navListWidget.setFrameShape(QFrame.NoFrame)
-        self.navListWidget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.navListWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
         # 添加导航项
-        generalItem = QListWidgetItem("常规设置")
-        generalItem.setData(Qt.UserRole, "general")
-        self.navListWidget.addItem(generalItem)
-        
-        appearanceItem = QListWidgetItem("外观")
-        appearanceItem.setData(Qt.UserRole, "appearance")
-        self.navListWidget.addItem(appearanceItem)
-        
-        editorItem = QListWidgetItem("编辑器")
-        editorItem.setData(Qt.UserRole, "editor")
-        self.navListWidget.addItem(editorItem)
-        
-        # 添加更多导航项
-        aboutItem = QListWidgetItem("关于")
-        aboutItem.setData(Qt.UserRole, "about")
-        self.navListWidget.addItem(aboutItem)
+        self.navListWidget.addItem("常规设置")
+        self.navListWidget.addItem("编辑器")
+        self.navListWidget.addItem("外观")
+        self.navListWidget.addItem("关于")
         
         navLayout.addWidget(self.navListWidget)
         
-        # 右侧内容区
+        # 右侧内容区域
         rightWidget = QWidget()
-        rightWidget.setObjectName("rightWidget")
         rightLayout = QVBoxLayout(rightWidget)
-        rightLayout.setContentsMargins(20, 20, 20, 20)
+        rightLayout.setContentsMargins(10, 0, 0, 0)
         
+        # 内容堆栈
         self.contentStack = QTabWidget()
-        self.contentStack.setObjectName("contentStack")
         self.contentStack.tabBar().setVisible(False)
-        self.contentStack.setFocusPolicy(Qt.NoFocus)
         
-        # 添加设置页面
+        # 添加内容页面
         self.generalPage = QWidget()
-        self.setupGeneralPage()
-        
-        self.appearancePage = QWidget()
-        self.setupAppearancePage()
-        
         self.editorPage = QWidget()
-        self.setupEditorPage()
-        
+        self.appearancePage = QWidget()
         self.aboutPage = QWidget()
+        
+        # 设置各页面内容
+        self.setupGeneralPage()
+        self.setupEditorPage()
+        self.setupAppearancePage()
         self.setupAboutPage()
         
         self.contentStack.addTab(self.generalPage, "常规设置")
-        self.contentStack.addTab(self.appearancePage, "外观")
         self.contentStack.addTab(self.editorPage, "编辑器")
+        self.contentStack.addTab(self.appearancePage, "外观")
         self.contentStack.addTab(self.aboutPage, "关于")
         
         rightLayout.addWidget(self.contentStack)
         
-        # 底部按钮区域
+        # 底部按钮
         buttonWidget = QWidget()
-        buttonWidget.setObjectName("buttonWidget")
         buttonLayout = QHBoxLayout(buttonWidget)
+        buttonLayout.setContentsMargins(0, 10, 0, 0)
         
-        self.saveButton = NoFocusButton("保存")
-        self.saveButton.setObjectName("saveButton")
-        self.cancelButton = NoFocusButton("取消")
-        self.cancelButton.setObjectName("cancelButton")
+        self.cancelButton = QPushButton("取消")
+        self.cancelButton.setDefault(False)
+        self.cancelButton.setAutoDefault(False)
+        self.cancelButton.setFixedWidth(100)
         
-        buttonLayout.addStretch(1)
+        self.saveButton = QPushButton("保存")
+        self.saveButton.setDefault(True)
+        self.saveButton.setAutoDefault(True)
+        self.saveButton.setFixedWidth(100)
+        
+        buttonLayout.addStretch()
         buttonLayout.addWidget(self.cancelButton)
         buttonLayout.addWidget(self.saveButton)
         
@@ -204,55 +231,50 @@ class SettingsDialog(QDialog):
         
         # 应用样式
         self.applyStyle()
-        
+    
     def setupGeneralPage(self):
-        from PySide6.QtWidgets import QCheckBox, QGroupBox, QFormLayout, QSpinBox, QFileDialog, QLineEdit
+        """设置'常规设置'页面的内容"""
+        layout = QVBoxLayout(self.generalPage)
         
-        generalLayout = QVBoxLayout(self.generalPage)
-        generalLayout.setSpacing(20)
-        
-        # 启动选项
+        # 启动组
         startupGroup = QGroupBox("启动选项")
-        startupGroup.setFocusPolicy(Qt.NoFocus)
-        startupGroup.setObjectName("settingsGroup")
         startupLayout = QVBoxLayout(startupGroup)
         
         self.autoStartCheckbox = QCheckBox("系统启动时自动运行")
-        self.autoStartCheckbox.setFocusPolicy(Qt.NoFocus)
         self.rememberWindowCheckbox = QCheckBox("记住窗口位置和大小")
-        self.rememberWindowCheckbox.setFocusPolicy(Qt.NoFocus)
         self.reopenFilesCheckbox = QCheckBox("重新打开上次的文件")
-        self.reopenFilesCheckbox.setFocusPolicy(Qt.NoFocus)
+        
+        # 加载设置值
+        self.autoStartCheckbox.setChecked(self.settings["general"]["startup"]["auto_start"])
+        self.rememberWindowCheckbox.setChecked(self.settings["general"]["startup"]["remember_window"])
+        self.reopenFilesCheckbox.setChecked(self.settings["general"]["startup"]["reopen_files"])
         
         startupLayout.addWidget(self.autoStartCheckbox)
         startupLayout.addWidget(self.rememberWindowCheckbox)
         startupLayout.addWidget(self.reopenFilesCheckbox)
         
-        # 文件选项
+        # 文件组
         fileGroup = QGroupBox("文件选项")
-        fileGroup.setFocusPolicy(Qt.NoFocus)
-        fileGroup.setObjectName("settingsGroup")
         fileLayout = QFormLayout(fileGroup)
         
         self.defaultSavePathEdit = QLineEdit()
-        self.defaultSavePathEdit.setFocusPolicy(Qt.NoFocus)
+        self.defaultSavePathEdit.setText(self.settings["general"]["file"]["default_save_path"])
         self.defaultSavePathEdit.setReadOnly(True)
-        self.defaultSavePathEdit.setPlaceholderText("选择默认保存路径...")
         
-        browseSavePathBtn = NoFocusButton("浏览...")
+        browseSavePathBtn = QPushButton("浏览...")
         browseSavePathBtn.clicked.connect(self.browseSavePath)
         
         savePathLayout = QHBoxLayout()
         savePathLayout.addWidget(self.defaultSavePathEdit)
         savePathLayout.addWidget(browseSavePathBtn)
         
-        self.autoSaveCheckbox = QCheckBox("自动保存")
-        self.autoSaveCheckbox.setFocusPolicy(Qt.NoFocus)
+        self.autoSaveCheckbox = QCheckBox("启用")
+        self.autoSaveCheckbox.setChecked(self.settings["general"]["file"]["auto_save"])
+        
         self.autoSaveIntervalSpinBox = QSpinBox()
-        self.autoSaveIntervalSpinBox.setFocusPolicy(Qt.NoFocus)
         self.autoSaveIntervalSpinBox.setMinimum(1)
         self.autoSaveIntervalSpinBox.setMaximum(60)
-        self.autoSaveIntervalSpinBox.setValue(5)
+        self.autoSaveIntervalSpinBox.setValue(self.settings["general"]["file"]["auto_save_interval"])
         self.autoSaveIntervalSpinBox.setSuffix(" 分钟")
         
         autoSaveLayout = QHBoxLayout()
@@ -263,782 +285,257 @@ class SettingsDialog(QDialog):
         fileLayout.addRow("默认保存位置:", savePathLayout)
         fileLayout.addRow("自动保存:", autoSaveLayout)
         
-        # 其他选项
+        # 其他选项组
         otherGroup = QGroupBox("其他选项")
-        otherGroup.setFocusPolicy(Qt.NoFocus)
-        otherGroup.setObjectName("settingsGroup")
         otherLayout = QVBoxLayout(otherGroup)
         
         self.showStatusBarCheckbox = QCheckBox("显示状态栏")
-        self.showStatusBarCheckbox.setFocusPolicy(Qt.NoFocus)
+        self.showStatusBarCheckbox.setChecked(self.settings["general"]["other"]["show_status_bar"])
+        
         self.enableSoundEffectsCheckbox = QCheckBox("启用声音效果")
-        self.enableSoundEffectsCheckbox.setFocusPolicy(Qt.NoFocus)
+        self.enableSoundEffectsCheckbox.setChecked(self.settings["general"]["other"]["enable_sound_effects"])
         
         otherLayout.addWidget(self.showStatusBarCheckbox)
         otherLayout.addWidget(self.enableSoundEffectsCheckbox)
         
-        # 将所有组添加到主布局
-        generalLayout.addWidget(startupGroup)
-        generalLayout.addWidget(fileGroup)
-        generalLayout.addWidget(otherGroup)
-        generalLayout.addStretch(1)
-        
-        # 设置默认值
-        self.loadGeneralSettings()
+        # 添加所有组到主布局
+        layout.addWidget(startupGroup)
+        layout.addWidget(fileGroup)
+        layout.addWidget(otherGroup)
+        layout.addStretch(1)
     
-    def setupAppearancePage(self):
-        from PySide6.QtWidgets import QGroupBox, QSlider, QWidget, QHBoxLayout, QLabel
-
-        appearanceLayout = QVBoxLayout(self.appearancePage)
-        
-        # 主题模式选择
-        themeGroup = QGroupBox("主题模式")
-        themeGroup.setFocusPolicy(Qt.NoFocus)
-        themeGroup.setObjectName("settingsGroup")
-        themeLayout = QVBoxLayout(themeGroup)
-        
-        # 主题设置区域
-        themeButton = NoFocusButton("打开主题设置")
-        themeButton.setObjectName("themeButton")
-        themeButton.clicked.connect(self.openThemeSettings)
-        
-        themeLayout.addWidget(themeButton)
-        
-        # 界面缩放选项
-        scaleGroup = QGroupBox("界面缩放")
-        scaleGroup.setFocusPolicy(Qt.NoFocus)
-        scaleGroup.setObjectName("settingsGroup")
-        scaleLayout = QVBoxLayout(scaleGroup)
-        
-        scaleSlider = QWidget()
-        scaleSlider.setFocusPolicy(Qt.NoFocus)
-        scaleSliderLayout = QHBoxLayout(scaleSlider)
-        scaleSliderLayout.setContentsMargins(0, 0, 0, 0)
-        
-        scaleLabel = QLabel("100%")
-        scaleLabel.setFocusPolicy(Qt.NoFocus)
-        scaleLabel.setAlignment(Qt.AlignCenter)
-        scaleLabel.setFixedWidth(50)
-        
-        smallerButton = NoFocusButton("-")
-        smallerButton.setFixedSize(30, 30)
-        smallerButton.setObjectName("smallerButton")
-        
-        largerButton = NoFocusButton("+")
-        largerButton.setFixedSize(30, 30)
-        largerButton.setObjectName("largerButton")
-        
-        scaleSliderLayout.addWidget(smallerButton)
-        scaleSliderLayout.addStretch()
-        scaleSliderLayout.addWidget(scaleLabel)
-        scaleSliderLayout.addStretch()
-        scaleSliderLayout.addWidget(largerButton)
-        
-        scaleLayout.addWidget(scaleSlider)
-        
-        # 添加外观选项到布局
-        appearanceLayout.addWidget(themeGroup)
-        appearanceLayout.addWidget(scaleGroup)
-        appearanceLayout.addStretch(1)
-        
     def setupEditorPage(self):
-        from PySide6.QtWidgets import QComboBox, QCheckBox, QGroupBox, QFormLayout, QSpinBox, QFontComboBox
+        """设置'编辑器'页面的内容"""
+        layout = QVBoxLayout(self.editorPage)
         
-        editorLayout = QVBoxLayout(self.editorPage)
-        editorLayout.setSpacing(20)
-        
-        # 字体设置
+        # 字体和大小组
         fontGroup = QGroupBox("字体设置")
-        fontGroup.setFocusPolicy(Qt.NoFocus)
-        fontGroup.setObjectName("settingsGroup")
         fontLayout = QFormLayout(fontGroup)
         
-        # 字体信息显示
-        self.fontInfoLabel = QLabel("当前字体: Consolas, 15pt")
-        self.fontInfoLabel.setFocusPolicy(Qt.NoFocus)
+        # 字体选择器
+        self.fontComboBox = QFontComboBox()
+        self.fontComboBox.setCurrentFont(QFont(self.settings["editor"]["font"]["family"]))
         
-        # 字体选择按钮
-        self.fontSelectButton = QPushButton("字体选择...")
-        self.fontSelectButton.setFocusPolicy(Qt.NoFocus)
-        self.fontSelectButton.clicked.connect(self.openFontDialog)
+        # 字体大小选择器
+        self.fontSizeSpinBox = QSpinBox()
+        self.fontSizeSpinBox.setMinimum(8)
+        self.fontSizeSpinBox.setMaximum(72)
+        self.fontSizeSpinBox.setValue(self.settings["editor"]["font"]["size"])
         
-        # 字体预览标签
-        self.fontPreviewLabel = QLabel("AaBbCcXxYyZz 1234567890 花火笔记，随你四季")
-        self.fontPreviewLabel.setFocusPolicy(Qt.NoFocus)
-        self.fontPreviewLabel.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-        self.fontPreviewLabel.setMinimumHeight(60)
-        self.fontPreviewLabel.setStyleSheet("padding: 8px;")
-        self.fontPreviewLabel.setAlignment(Qt.AlignCenter)
+        fontLayout.addRow("字体:", self.fontComboBox)
+        fontLayout.addRow("大小:", self.fontSizeSpinBox)
         
-        fontLayout.addRow(self.fontInfoLabel)
-        fontLayout.addRow(self.fontSelectButton)
-        fontLayout.addRow("预览:", self.fontPreviewLabel)
-        
-        # 编辑选项
-        editGroup = QGroupBox("编辑选项")
-        editGroup.setFocusPolicy(Qt.NoFocus)
-        editGroup.setObjectName("settingsGroup")
-        editLayout = QVBoxLayout(editGroup)
+        # 编辑选项组
+        editingGroup = QGroupBox("编辑选项")
+        editingLayout = QVBoxLayout(editingGroup)
         
         self.autoIndentCheckbox = QCheckBox("自动缩进")
-        self.autoIndentCheckbox.setFocusPolicy(Qt.NoFocus)
+        self.autoIndentCheckbox.setChecked(self.settings["editor"]["editing"]["auto_indent"])
+        
         self.lineNumbersCheckbox = QCheckBox("显示行号")
-        self.lineNumbersCheckbox.setFocusPolicy(Qt.NoFocus)
+        self.lineNumbersCheckbox.setChecked(self.settings["editor"]["editing"]["line_numbers"])
+        
         self.spellCheckCheckbox = QCheckBox("拼写检查")
-        self.spellCheckCheckbox.setFocusPolicy(Qt.NoFocus)
+        self.spellCheckCheckbox.setChecked(self.settings["editor"]["editing"]["spell_check"])
+        
         self.wordWrapCheckbox = QCheckBox("自动换行")
-        self.wordWrapCheckbox.setFocusPolicy(Qt.NoFocus)
+        self.wordWrapCheckbox.setChecked(self.settings["editor"]["editing"]["word_wrap"])
         
-        editLayout.addWidget(self.autoIndentCheckbox)
-        editLayout.addWidget(self.lineNumbersCheckbox)
-        editLayout.addWidget(self.spellCheckCheckbox)
-        editLayout.addWidget(self.wordWrapCheckbox)
+        editingLayout.addWidget(self.autoIndentCheckbox)
+        editingLayout.addWidget(self.lineNumbersCheckbox)
+        editingLayout.addWidget(self.spellCheckCheckbox)
+        editingLayout.addWidget(self.wordWrapCheckbox)
         
-        # 高级编辑设置
-        advancedGroup = QGroupBox("高级设置")
-        advancedGroup.setFocusPolicy(Qt.NoFocus)
-        advancedGroup.setObjectName("settingsGroup")
-        advancedLayout = QVBoxLayout(advancedGroup)
+        # 添加所有组到主布局
+        layout.addWidget(fontGroup)
+        layout.addWidget(editingGroup)
+        layout.addStretch(1)
+    
+    def setupAppearancePage(self):
+        """设置'外观'页面的内容"""
+        layout = QVBoxLayout(self.appearancePage)
         
-        self.codeHighlightCheckbox = QCheckBox("代码高亮")
-        self.codeHighlightCheckbox.setFocusPolicy(Qt.NoFocus)
-        self.autoCompleteCheckbox = QCheckBox("自动完成")
-        self.autoCompleteCheckbox.setFocusPolicy(Qt.NoFocus)
+        # 主题选择按钮
+        themeLabel = QLabel("主题设置")
+        themeLabel.setFont(QFont("", 12, QFont.Bold))
         
-        advancedLayout.addWidget(self.codeHighlightCheckbox)
-        advancedLayout.addWidget(self.autoCompleteCheckbox)
+        themeButton = QPushButton("打开主题设置")
+        themeButton.clicked.connect(self.openThemeSettings)
         
-        # 将所有组添加到主布局
-        editorLayout.addWidget(fontGroup)
-        editorLayout.addWidget(editGroup)
-        editorLayout.addWidget(advancedGroup)
-        editorLayout.addStretch(1)
-        
-        # 设置默认值
-        self.loadEditorSettings()
-        
-    def setupAboutPage(self):
-        aboutLayout = QVBoxLayout(self.aboutPage)
-        
-        # 添加Logo和标题
-        logoContainer = QWidget()
-        logoContainer.setFocusPolicy(Qt.NoFocus)
-        logoLayout = QVBoxLayout(logoContainer)
-        
-        logoLabel = QLabel("Hanabi Notes")
-        logoLabel.setFocusPolicy(Qt.NoFocus)
-        logoLabel.setObjectName("logoLabel")
-        logoLabel.setAlignment(Qt.AlignCenter)
-        logoLabel.setFont(QFont("", 24, QFont.Bold))
-        
-        versionLabel = QLabel("版本 0.0.1")
-        versionLabel.setFocusPolicy(Qt.NoFocus)
-        versionLabel.setObjectName("versionLabel")
-        versionLabel.setAlignment(Qt.AlignCenter)
-        
-        logoLayout.addWidget(logoLabel)
-        logoLayout.addWidget(versionLabel)
-        
-        # 添加描述文字
-        descLabel = QLabel("Hanabi Notes is a simple and easy-to-use note-taking application. \n Designed for writing and recording ideas. \n Next Generation of TsukiNotes")
-        descLabel.setFocusPolicy(Qt.NoFocus)
-        descLabel.setWordWrap(True)
-        descLabel.setAlignment(Qt.AlignCenter)
-        descLabel.setObjectName("descLabel")
-        
-        # 添加版权信息
-        copyrightLabel = QLabel("© 2025 Clut Network. All rights reserved.")
-        copyrightLabel.setFocusPolicy(Qt.NoFocus)
-        copyrightLabel.setAlignment(Qt.AlignCenter)
-        copyrightLabel.setObjectName("copyrightLabel")
-        
-        # 添加按钮
-        buttonsContainer = QWidget()
-        buttonsContainer.setFocusPolicy(Qt.NoFocus)
-        buttonsLayout = QHBoxLayout(buttonsContainer)
-        
-        websiteButton = NoFocusButton("访问网站")
-        websiteButton.setObjectName("linkButton")
-        
-        updateButton = NoFocusButton("检查更新")
-        updateButton.setObjectName("linkButton")
-        
-        buttonsLayout.addStretch()
-        buttonsLayout.addWidget(websiteButton)
-        buttonsLayout.addWidget(updateButton)
-        buttonsLayout.addStretch()
+        themeLayout = QVBoxLayout()
+        themeLayout.addWidget(themeLabel)
+        themeLayout.addWidget(themeButton)
         
         # 添加到主布局
-        aboutLayout.addStretch()
-        aboutLayout.addWidget(logoContainer)
-        aboutLayout.addSpacing(20)
-        aboutLayout.addWidget(descLabel)
-        aboutLayout.addSpacing(20)
-        aboutLayout.addWidget(copyrightLabel)
-        aboutLayout.addSpacing(20)
-        aboutLayout.addWidget(buttonsContainer)
-        aboutLayout.addStretch()
+        layout.addLayout(themeLayout)
+        layout.addStretch(1)
     
-    def browseSavePath(self):
-        from PySide6.QtWidgets import QFileDialog
+    def setupAboutPage(self):
+        """设置'关于'页面的内容"""
+        layout = QVBoxLayout(self.aboutPage)
         
-        dirPath = QFileDialog.getExistingDirectory(
-            self,
-            "选择默认保存位置",
-            self.defaultSavePathEdit.text() or os.path.expanduser("~")
+        # 应用标题
+        titleLabel = QLabel("Hanabi Notes")
+        titleLabel.setFont(QFont("", 18, QFont.Bold))
+        titleLabel.setAlignment(Qt.AlignCenter)
+        
+        # 版本信息
+        versionLabel = QLabel("版本: 1.0.0")
+        versionLabel.setAlignment(Qt.AlignCenter)
+        
+        # 著作权信息
+        copyrightLabel = QLabel("© 2023-2025 Hanabi Notes Team. 保留所有权利。")
+        copyrightLabel.setAlignment(Qt.AlignCenter)
+        
+        # 描述
+        descriptionText = QTextBrowser()
+        descriptionText.setReadOnly(True)
+        descriptionText.setOpenExternalLinks(True)
+        descriptionText.setHtml("""
+            <div style="text-align: center;">
+                <p>Hanabi Notes 是一个简洁、美观、功能强大的笔记应用。</p>
+                <p>支持多种格式的笔记，包括文本、Markdown、代码等。</p>
+                <p>项目主页: <a href="https://github.com/username/hanabi-notes">https://github.com/username/hanabi-notes</a></p>
+            </div>
+        """)
+        
+        # 添加到主布局
+        layout.addWidget(titleLabel)
+        layout.addWidget(versionLabel)
+        layout.addWidget(copyrightLabel)
+        layout.addWidget(descriptionText)
+        
+    def browseSavePath(self):
+        """浏览默认保存路径"""
+        current_path = self.defaultSavePathEdit.text()
+        if not current_path:
+            current_path = os.path.expanduser("~")
+            
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "选择默认保存目录", current_path,
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         )
         
-        if dirPath:
-            self.defaultSavePathEdit.setText(dirPath)
+        if dir_path:
+            self.defaultSavePathEdit.setText(dir_path)
     
     def openThemeSettings(self):
+        """打开主题设置对话框"""
         try:
-            mainWindow = self.parent()
-            if mainWindow and hasattr(mainWindow, 'showThemeSettings'):
-                self.accept()
-                mainWindow.showThemeSettings()
+            parent = self.parent()
+            if parent and hasattr(parent, 'showThemeSettings'):
+                parent.showThemeSettings()
             else:
-                from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
-                information(self, "提示", "无法打开主题设置")
+                theme_dialog = ThemeSettingsDialog(self)
+                theme_dialog.exec()
         except Exception as e:
-            from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
-            warning(self, "错误", f"打开主题设置时出错: {str(e)}")
-    
-    def openFontDialog(self):
-        try:
-            # 导入字体预览对话框
-            from Aya_Hanabi.Hanabi_Core.FontManager import FontPreviewDialog, FontManager
-            
-            # 获取当前字体设置
-            fontFamily = self.settings["editor"]["font"].get("family", "Consolas")
-            fontSize = self.settings["editor"]["font"].get("size", 15)
-            
-            # 创建当前字体对象
-            currentFont = QFont(fontFamily, fontSize)
-            
-            # 创建并显示字体预览对话框
-            fontDialog = FontPreviewDialog(self, currentFont)
-            fontDialog.fontSelected.connect(self.onFontSelected)
-            
-            fontDialog.exec()
-        except Exception as e:
-            from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
-            warning(self, "错误", f"打开字体对话框时出错: {str(e)}")
-
-    def loadGeneralSettings(self):
-        startupSettings = self.settings["general"]["startup"]
-        fileSettings = self.settings["general"]["file"]
-        otherSettings = self.settings["general"]["other"]
-        
-        self.autoStartCheckbox.setChecked(startupSettings.get("auto_start", False))
-        self.rememberWindowCheckbox.setChecked(startupSettings.get("remember_window", True))
-        self.reopenFilesCheckbox.setChecked(startupSettings.get("reopen_files", True))
-        
-        self.defaultSavePathEdit.setText(fileSettings.get("default_save_path", ""))
-        self.autoSaveCheckbox.setChecked(fileSettings.get("auto_save", True))
-        self.autoSaveIntervalSpinBox.setValue(fileSettings.get("auto_save_interval", 5))
-        
-        self.showStatusBarCheckbox.setChecked(otherSettings.get("show_status_bar", True))
-        self.enableSoundEffectsCheckbox.setChecked(otherSettings.get("enable_sound_effects", False))
-
-    def onFontSelected(self, family, size, bold, italic):
-        # 更新设置
-        self.settings["editor"]["font"]["family"] = family
-        self.settings["editor"]["font"]["size"] = size
-        
-        # 如果之前没有bold和italic设置，添加它们
-        if "style" not in self.settings["editor"]["font"]:
-            self.settings["editor"]["font"]["style"] = {}
-        
-        self.settings["editor"]["font"]["style"]["bold"] = bold
-        self.settings["editor"]["font"]["style"]["italic"] = italic
-        
-        # 更新界面显示
-        self.fontInfoLabel.setText(f"当前字体: {family}, {size}pt{' 粗体' if bold else ''}{' 斜体' if italic else ''}")
-        
-        # 更新预览标签的字体
-        try:
-            previewFont = QFont(family, size)
-            previewFont.setBold(bold)
-            previewFont.setItalic(italic)
-            
-            # 使用样式表强制应用字体
-            self.fontPreviewLabel.setStyleSheet(f"""
-                padding: 8px;
-                font-family: "{family}";
-                font-size: {size}pt;
-                font-weight: {700 if bold else 400};
-                font-style: {("italic" if italic else "normal")};
-            """)
-            
-            # 同时也设置字体对象
-            self.fontPreviewLabel.setFont(previewFont)
-            
-            # 更新文本以强制重新渲染
-            currentText = self.fontPreviewLabel.text()
-            self.fontPreviewLabel.setText("")
-            self.fontPreviewLabel.setText(currentText)
-            
-            # 强制更新
-            self.fontPreviewLabel.update()
-            self.fontPreviewLabel.repaint()
-            
-            # 更新界面
-            QApplication.processEvents()
-            
-            print(f"字体预览已更新: {family}, {size}pt, 粗体={bold}, 斜体={italic}")
-        except Exception as e:
-            print(f"更新字体预览时出错: {e}")
-
-    def loadEditorSettings(self):
-        fontSettings = self.settings["editor"]["font"]
-        editingSettings = self.settings["editor"]["editing"]
-        
-        # 获取字体设置
-        fontFamily = fontSettings.get("family", "Consolas")
-        fontSize = fontSettings.get("size", 15)
-        
-        # 获取字体样式设置
-        fontStyle = fontSettings.get("style", {})
-        bold = fontStyle.get("bold", False)
-        italic = fontStyle.get("italic", False)
-        
-        # 更新字体信息标签
-        self.fontInfoLabel.setText(f"当前字体: {fontFamily}, {fontSize}pt{' 粗体' if bold else ''}{' 斜体' if italic else ''}")
-        
-        # 更新预览标签的字体
-        try:
-            previewFont = QFont(fontFamily, fontSize)
-            previewFont.setBold(bold)
-            previewFont.setItalic(italic)
-            
-            # 使用样式表强制应用字体
-            self.fontPreviewLabel.setStyleSheet(f"""
-                padding: 8px;
-                font-family: "{fontFamily}";
-                font-size: {fontSize}pt;
-                font-weight: {700 if bold else 400};
-                font-style: {("italic" if italic else "normal")};
-            """)
-            
-            # 同时也设置字体对象
-            self.fontPreviewLabel.setFont(previewFont)
-            
-            # 更新文本以强制重新渲染
-            currentText = self.fontPreviewLabel.text()
-            self.fontPreviewLabel.setText("")
-            self.fontPreviewLabel.setText(currentText)
-            
-            # 强制更新
-            self.fontPreviewLabel.update()
-            self.fontPreviewLabel.repaint()
-            
-            # 更新界面
-            QApplication.processEvents()
-            
-            print(f"加载字体设置: {fontFamily}, {fontSize}pt, 粗体={bold}, 斜体={italic}")
-        except Exception as e:
-            print(f"加载字体设置时出错: {e}")
-        
-        # 设置编辑选项
-        self.autoIndentCheckbox.setChecked(editingSettings.get("auto_indent", True))
-        self.lineNumbersCheckbox.setChecked(editingSettings.get("line_numbers", True))
-        self.spellCheckCheckbox.setChecked(editingSettings.get("spell_check", False))
-        self.wordWrapCheckbox.setChecked(editingSettings.get("word_wrap", True))
-        
-        # 设置高级选项默认值
-        self.codeHighlightCheckbox.setChecked(True)
-        self.autoCompleteCheckbox.setChecked(False)
-    
-    def saveSettings(self):
-        # 更新设置字典
-        
-        # 常规设置
-        self.settings["general"]["startup"]["auto_start"] = self.autoStartCheckbox.isChecked()
-        self.settings["general"]["startup"]["remember_window"] = self.rememberWindowCheckbox.isChecked()
-        self.settings["general"]["startup"]["reopen_files"] = self.reopenFilesCheckbox.isChecked()
-        
-        self.settings["general"]["file"]["default_save_path"] = self.defaultSavePathEdit.text()
-        self.settings["general"]["file"]["auto_save"] = self.autoSaveCheckbox.isChecked()
-        self.settings["general"]["file"]["auto_save_interval"] = self.autoSaveIntervalSpinBox.value()
-        
-        self.settings["general"]["other"]["show_status_bar"] = self.showStatusBarCheckbox.isChecked()
-        self.settings["general"]["other"]["enable_sound_effects"] = self.enableSoundEffectsCheckbox.isChecked()
-        
-        # 编辑器设置 - 字体设置现在通过onFontSelected方法更新
-        
-        # 编辑设置
-        self.settings["editor"]["editing"]["auto_indent"] = self.autoIndentCheckbox.isChecked()
-        self.settings["editor"]["editing"]["line_numbers"] = self.lineNumbersCheckbox.isChecked()
-        self.settings["editor"]["editing"]["spell_check"] = self.spellCheckCheckbox.isChecked()
-        self.settings["editor"]["editing"]["word_wrap"] = self.wordWrapCheckbox.isChecked()
-        
-        # 保存高级设置
-        if "advanced" not in self.settings["editor"]:
-            self.settings["editor"]["advanced"] = {}
-        self.settings["editor"]["advanced"]["code_highlight"] = self.codeHighlightCheckbox.isChecked()
-        self.settings["editor"]["advanced"]["auto_complete"] = self.autoCompleteCheckbox.isChecked()
-        
-        # 保存设置到文件
-        self.writeSettings()
-        
-        # 发出设置变更信号
-        self.settingsChanged.emit()
-        
-        # 关闭对话框
-        self.accept()
+            print(f"打开主题设置对话框时出错: {e}")
     
     def loadSettings(self):
+        """从配置文件加载设置"""
         try:
-            settings_dir = self.getSettingsDir()
+            settings_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
             settings_file = os.path.join(settings_dir, "settings.json")
             
             if os.path.exists(settings_file):
                 with open(settings_file, 'r', encoding='utf-8') as f:
-                    loaded_settings = json.load(f)
-                    
-                    # 深度更新设置字典
-                    self.deepUpdate(self.settings, loaded_settings)
+                    saved_settings = json.load(f)
+                
+                # 更新设置
+                if "general" in saved_settings:
+                    self.updateSettingDict(self.settings["general"], saved_settings["general"])
+                
+                if "editor" in saved_settings:
+                    self.updateSettingDict(self.settings["editor"], saved_settings["editor"])
         except Exception as e:
-            print(f"加载设置时出错: {str(e)}")
+            print(f"加载设置时出错: {e}")
     
-    def writeSettings(self):
-        try:
-            settings_dir = self.getSettingsDir()
-            os.makedirs(settings_dir, exist_ok=True)
-            
-            settings_file = os.path.join(settings_dir, "settings.json")
-            
-            with open(settings_file, 'w', encoding='utf-8') as f:
-                json.dump(self.settings, f, ensure_ascii=False, indent=2)
-                
-            # 如果配置了自动启动，处理系统启动项
-            self.setupAutoStart(self.settings["general"]["startup"]["auto_start"])
-                
-        except Exception as e:
-            print(f"保存设置时出错: {str(e)}")
-            from Aya_Hanabi.Hanabi_Core.UI.messageBox import HanabiMessageBox, information, warning, critical, question, success
-            warning(self, "保存失败", f"保存设置时出错: {str(e)}")
-    
-    def getSettingsDir(self):
-        app_data_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
-        return app_data_dir
-    
-    def setupAutoStart(self, enable):
-        try:
-            import sys
-            import platform
-            
-            system = platform.system()
-            
-            if system == "Windows":
-                import winreg
-                
-                app_path = sys.executable
-                app_name = "HanabiNotes"
-                
-                # Windows注册表路径
-                key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-                
-                try:
-                    if enable:
-                        # 添加到启动项
-                        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE)
-                        winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, f'"{app_path}"')
-                        winreg.CloseKey(key)
-                    else:
-                        # 从启动项移除
-                        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE)
-                        try:
-                            winreg.DeleteValue(key, app_name)
-                        except:
-                            pass
-                        winreg.CloseKey(key)
-                except Exception as e:
-                    print(f"设置自启动时出错: {str(e)}")
-            elif system == "Linux":
-                # Linux自启动脚本路径
-                autostart_dir = os.path.expanduser("~/.config/autostart")
-                autostart_file = os.path.join(autostart_dir, "hanabi-notes.desktop")
-                
-                if enable:
-                    # 创建自启动文件
-                    os.makedirs(autostart_dir, exist_ok=True)
-                    
-                    with open(autostart_file, "w") as f:
-                        f.write("[Desktop Entry]\n")
-                        f.write("Type=Application\n")
-                        f.write("Name=Hanabi Notes\n")
-                        f.write(f"Exec={sys.executable}\n")
-                        f.write("Terminal=false\n")
-                        f.write("X-GNOME-Autostart-enabled=true\n")
-                else:
-                    # 删除自启动文件
-                    if os.path.exists(autostart_file):
-                        os.remove(autostart_file)
-            elif system == "Darwin":
-                # macOS自启动plist路径
-                plist_dir = os.path.expanduser("~/Library/LaunchAgents")
-                plist_file = os.path.join(plist_dir, "com.hanabi.notes.plist")
-                
-                if enable:
-                    # 创建plist文件
-                    os.makedirs(plist_dir, exist_ok=True)
-                    
-                    plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.hanabi.notes</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{sys.executable}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>"""
-                    
-                    with open(plist_file, "w") as f:
-                        f.write(plist_content)
-                else:
-                    # 删除plist文件
-                    if os.path.exists(plist_file):
-                        os.remove(plist_file)
-        except Exception as e:
-            print(f"设置自启动项时出错: {str(e)}")
-    
-    def deepUpdate(self, target, source):
+    def updateSettingDict(self, target, source):
+        """递归更新设置字典"""
         for key, value in source.items():
-            if key in target and isinstance(target[key], dict) and isinstance(value, dict):
-                self.deepUpdate(target[key], value)
-            else:
-                target[key] = value
+            if key in target:
+                if isinstance(value, dict) and isinstance(target[key], dict):
+                    self.updateSettingDict(target[key], value)
+                else:
+                    target[key] = value
+    
+    def updateSetting(self, path, value):
+        """更新单个设置值"""
+        target = self.settings
+        for p in path[:-1]:
+            if p not in target:
+                target[p] = {}
+            target = target[p]
+        
+        target[path[-1]] = value
     
     def applyStyle(self):
+        """应用样式到设置对话框"""
+        # 应用基本样式
         self.setStyleSheet("""
             QDialog {
-                background-color: #f5f5f5;
-                border-radius: 10px;
+                background-color: #FFFFFF;
             }
             
-            #titleBar {
-                background-color: #e8e8e8;
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
-            }
-            
-            #titleLabel {
-                color: #333333;
-            }
-            
-            #contentWidget {
-                background-color: #f5f5f5;
-            }
-            
-            #navWidget {
-                background-color: #e8e8e8;
-                border-top-right-radius: 0px;
-                border-bottom-left-radius: 10px;
-            }
-            
-            #navListWidget {
-                background-color: transparent;
+            QListWidget {
+                background-color: #F3F4F6;
+                border: none;
+                border-radius: 4px;
                 color: #333333;
                 font-size: 14px;
+                padding: 5px;
             }
             
-            #navListWidget::item {
-                padding: 10px;
-                border-radius: 5px;
+            QListWidget::item {
+                padding: 8px 12px;
+                border-radius: 4px;
             }
             
-            #navListWidget::item:selected {
-                background-color: #d0d0d0;
-            }
-            
-            #navListWidget::item:hover:!selected {
-                background-color: rgba(0, 0, 0, 0.05);
-            }
-            
-            #rightWidget {
-                background-color: #f5f5f5;
-                border-bottom-right-radius: 10px;
-                color: #333333;
-            }
-            
-            #contentStack {
-                background-color: transparent;
-                border: none;
-            }
-            
-            QLabel {
-                color: #333333;
-            }
-            
-            QPushButton {
-                background-color: #e0e0e0;
-                color: #333333;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 5px;
-            }
-            
-            QPushButton:hover {
-                background-color: #d0d0d0;
-            }
-            
-            #saveButton {
-                background-color: #0066cc;
+            QListWidget::item:selected {
+                background-color: #6B9FFF;
                 color: white;
             }
             
-            #saveButton:hover {
-                background-color: #0055bb;
+            QListWidget::item:hover:!selected {
+                background-color: rgba(0, 0, 0, 0.05);
             }
             
-            QCheckBox {
-                color: #333333;
-            }
-            
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border-radius: 3px;
-                border: 1px solid #b0b0b0;
-                background: #ffffff;
-            }
-            
-            QCheckBox::indicator:checked {
-                background: #0066cc;
-                border: 1px solid #0066cc;
-            }
-            
-            QComboBox, QSpinBox {
-                background-color: #ffffff;
-                color: #333333;
-                border: 1px solid #d0d0d0;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            
-            QLineEdit {
-                background-color: #ffffff;
-                color: #333333;
-                border: 1px solid #d0d0d0;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            
-            QGroupBox {
-                border: 1px solid #d0d0d0;
-                border-radius: 5px;
-                margin-top: 1.5ex;
-                color: #333333;
-                font-weight: bold;
-            }
-            
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-            
-            #settingsGroup {
-                padding: 10px;
-            }
-            
-            #smallerButton, #largerButton {
-                font-size: 16px;
-                font-weight: bold;
-                padding: 0;
-            }
-            
-            #logoLabel {
-                color: #333333;
-                font-size: 24px;
-            }
-            
-            #versionLabel {
-                color: #666666;
-                font-size: 12px;
-            }
-            
-            #descLabel {
-                color: #333333;
-                font-size: 14px;
-                margin: 10px;
-            }
-            
-            #copyrightLabel {
-                color: #666666;
-                font-size: 12px;
-            }
-            
-            #linkButton {
-                background-color: transparent;
-                color: #0066cc;
-                text-decoration: underline;
+            QPushButton {
+                background-color: #6B9FFF;
+                color: white;
                 border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
             }
             
-            #linkButton:hover {
-                color: #0055bb;
+            QPushButton:hover {
+                background-color: #5A8AE8;
+            }
+            
+            QPushButton:pressed {
+                background-color: #4B7BD7;
             }
         """)
-
-    def refreshFontPreview(self):
-        """刷新字体预览显示"""
+    
+    def saveSettings(self):
+        """保存设置到配置文件"""
         try:
-            # 获取当前字体设置
-            fontSettings = self.settings["editor"]["font"]
-            fontFamily = fontSettings.get("family", "Consolas")
-            fontSize = fontSettings.get("size", 15)
+            settings_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
+            os.makedirs(settings_dir, exist_ok=True)
+            settings_file = os.path.join(settings_dir, "settings.json")
             
-            fontStyle = fontSettings.get("style", {})
-            bold = fontStyle.get("bold", False)
-            italic = fontStyle.get("italic", False)
+            with open(settings_file, 'w', encoding='utf-8') as f:
+                json.dump(self.settings, f, ensure_ascii=False, indent=4)
             
-            # 创建字体对象
-            font = QFont(fontFamily, fontSize)
-            font.setBold(bold)
-            font.setItalic(italic)
+            # 发送设置变更信号
+            self.settingsChanged.emit()
             
-            # 使用样式表强制应用字体
-            self.fontPreviewLabel.setStyleSheet(f"""
-                padding: 8px;
-                font-family: "{fontFamily}";
-                font-size: {fontSize}pt;
-                font-weight: {700 if bold else 400};
-                font-style: {("italic" if italic else "normal")};
-            """)
-            
-            # 同时也设置字体对象
-            self.fontPreviewLabel.setFont(font)
-            
-            # 更新文本以强制重新渲染
-            currentText = self.fontPreviewLabel.text()
-            self.fontPreviewLabel.setText("")
-            self.fontPreviewLabel.setText(currentText)
-            
-            # 强制更新
-            self.fontPreviewLabel.update()
-            self.fontPreviewLabel.repaint()
-            
-            # 更新界面
-            QApplication.processEvents()
-            
-            print(f"字体已更新: {fontFamily}, {fontSize}pt, 粗体={bold}, 斜体={italic}")
+            # 关闭对话框
+            self.accept()
         except Exception as e:
-            print(f"刷新字体预览时出错: {e}")
-
-    def showEvent(self, event):
-        """当对话框显示时调用"""
-        super().showEvent(event)
-        # 显示时刷新字体预览
-        self.refreshFontPreview()
+            print(f"保存设置时出错: {e}")
+            QMessageBox.warning(self, "错误", f"保存设置时出错: {str(e)}")
 
 # 主题设置对话框
 class ThemeSettingsDialog(QDialog):
@@ -1046,763 +543,1012 @@ class ThemeSettingsDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent = parent
-        
-        # 设置无焦点策略
-        self.setFocusPolicy(Qt.NoFocus)
-        
-        # 尝试获取父窗口的主题管理器
-        if hasattr(parent, 'themeManager'):
-            self.themeManager = parent.themeManager
-        # 如果没有主题管理器，尝试导入并创建一个
-        else:
-            try:
-                from Aya_Hanabi.Hanabi_Core.ThemeManager import ThemeManager
-                self.themeManager = ThemeManager()
-                self.themeManager.load_themes_from_directory()
-            except ImportError:
-                print("无法导入ThemeManager，使用默认主题")
-                self.themeManager = None
         
         self.setWindowTitle("主题设置")
-        self.setMinimumSize(800, 500)
+        self.setFixedSize(600, 400)
+        self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
         
-        # 应用样式
-        self.applyStyle()
-        
-        # 初始化主题
-        self.currentTheme = "dark"
-        if self.themeManager:
-            self.currentTheme = self.themeManager.current_theme_name
+        # 读取当前主题
+        self.current_theme = "light"
+        if parent and hasattr(parent, "themeManager"):
+            theme_manager = parent.themeManager
+            if hasattr(theme_manager, "current_theme_name"):
+                self.current_theme = theme_manager.current_theme_name
         
         self.initUI()
-        
+    
     def initUI(self):
-        # 主布局
+        # 创建布局
         mainLayout = QVBoxLayout(self)
-        mainLayout.setContentsMargins(0, 0, 0, 0)
-        mainLayout.setSpacing(0)
         
-        # 标题栏
-        titleBar = QWidget()
-        titleBar.setObjectName("titleBar")
-        titleBar.setFixedHeight(50)
-        titleBarLayout = QHBoxLayout(titleBar)
-        titleBarLayout.setContentsMargins(20, 0, 20, 0)
+        # 标题
+        titleLabel = QLabel("选择主题")
+        titleLabel.setFont(QFont("Microsoft YaHei", 14, QFont.Bold))
+        mainLayout.addWidget(titleLabel)
         
-        titleLabel = QLabel("主题设置")
-        titleLabel.setObjectName("titleLabel")
-        titleLabel.setFont(QFont("", 16, QFont.Bold))
-        
-        titleBarLayout.addWidget(titleLabel)
-        
-        mainLayout.addWidget(titleBar)
-        
-        # 内容区域
-        contentWidget = QWidget()
-        contentWidget.setObjectName("contentWidget")
-        contentLayout = QVBoxLayout(contentWidget)
-        contentLayout.setContentsMargins(20, 20, 20, 20)
-        
-        # 主题选择区域
-        themeSelectorLabel = QLabel("选择主题")
-        themeSelectorLabel.setFocusPolicy(Qt.NoFocus)
-        themeSelectorLabel.setFont(QFont("", 14))
-        contentLayout.addWidget(themeSelectorLabel)
-        
-        # 主题预览区
-        themesContainer = QWidget()
-        themesContainer.setFocusPolicy(Qt.NoFocus)
-        themesLayout = QGridLayout(themesContainer)
-        themesLayout.setContentsMargins(0, 10, 0, 10)
+        # 主题预览区域
+        themesLayout = QGridLayout()
         themesLayout.setSpacing(20)
         
-        self.themeCards = []
+        # 添加主题选项
+        self.addThemeOption(themesLayout, 0, 0, "light", "浅色主题", "#FFFFFF", "#333333")
+        self.addThemeOption(themesLayout, 0, 1, "dark", "深色主题", "#1E2128", "#E0E0E0")
+        self.addThemeOption(themesLayout, 1, 0, "purple_dream", "紫梦主题", "#2D1B69", "#E9E0FF")
+        self.addThemeOption(themesLayout, 1, 1, "green_theme", "青葱主题", "#1D3B2A", "#D0E6C7")
         
-        if self.themeManager:
-            try:
-                themes = self.themeManager.get_all_themes()
-                for i, (theme_name, display_name) in enumerate(themes):
-                    card = self.createThemeCard(theme_name, display_name)
-                    self.themeCards.append(card)
-                    row, col = divmod(i, 3)
-                    themesLayout.addWidget(card, row, col)
-            except Exception as e:
-                print(f"创建主题卡片时出错: {str(e)}")
-                # 添加默认主题卡片
-                self.addDefaultThemeCards(themesLayout)
-        else:
-            # 添加默认主题卡片
-            self.addDefaultThemeCards(themesLayout)
+        mainLayout.addLayout(themesLayout)
         
-        # 包装在滚动区域中
-        scrollArea = QScrollArea()
-        scrollArea.setFocusPolicy(Qt.NoFocus)
-        scrollArea.setObjectName("themeScrollArea")
-        scrollArea.setWidgetResizable(True)
-        scrollArea.setFrameShape(QFrame.NoFrame)
-        scrollArea.setWidget(themesContainer)
+        # 底部按钮
+        buttonLayout = QHBoxLayout()
         
-        contentLayout.addWidget(scrollArea, 1)
+        self.cancelButton = QPushButton("取消")
+        self.cancelButton.clicked.connect(self.reject)
         
-        # 底部按钮区域
-        buttonWidget = QWidget()
-        buttonWidget.setFocusPolicy(Qt.NoFocus)
-        buttonWidget.setObjectName("buttonWidget")
-        buttonLayout = QHBoxLayout(buttonWidget)
+        buttonLayout.addStretch()
+        buttonLayout.addWidget(self.cancelButton)
         
-        self.importButton = NoFocusButton("导入主题")
-        self.importButton.setObjectName("importButton")
+        mainLayout.addStretch()
+        mainLayout.addLayout(buttonLayout)
+    
+    def addThemeOption(self, layout, row, col, theme_id, theme_name, bg_color, text_color):
+        # 创建主题预览框
+        themeWidget = QWidget()
+        themeWidget.setObjectName(f"theme_{theme_id}")
+        themeWidget.setFixedSize(200, 120)
+        themeWidget.setCursor(Qt.PointingHandCursor)
         
-        self.closeButton = NoFocusButton("关闭")
-        self.closeButton.setObjectName("closeButton")
+        # 设置样式
+        is_selected = self.current_theme == theme_id
+        border_color = "#6B9FFF" if is_selected else "transparent"
         
-        buttonLayout.addWidget(self.importButton)
-        buttonLayout.addStretch(1)
-        buttonLayout.addWidget(self.closeButton)
+        themeWidget.setStyleSheet(f"""
+            QWidget#theme_{theme_id} {{
+                background-color: {bg_color};
+                border: 2px solid {border_color};
+                border-radius: 8px;
+            }}
+        """)
         
-        contentLayout.addWidget(buttonWidget)
+        # 布局
+        themeLayout = QVBoxLayout(themeWidget)
         
-        mainLayout.addWidget(contentWidget, 1)
+        # 主题名称
+        nameLabel = QLabel(theme_name)
+        nameLabel.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        nameLabel.setStyleSheet(f"color: {text_color};")
+        nameLabel.setAlignment(Qt.AlignCenter)
+        themeLayout.addWidget(nameLabel)
+        
+        # 选择指示器
+        if is_selected:
+            selectedLabel = QLabel("✓ 当前选择")
+            selectedLabel.setFont(QFont("Microsoft YaHei", 10))
+            selectedLabel.setStyleSheet(f"color: {text_color};")
+            selectedLabel.setAlignment(Qt.AlignCenter)
+            themeLayout.addWidget(selectedLabel)
+        
+        # 绑定点击事件
+        themeWidget.mouseReleaseEvent = lambda event, t=theme_id: self.selectTheme(t)
+        
+        layout.addWidget(themeWidget, row, col)
+    
+    def selectTheme(self, theme_id):
+        """选择主题"""
+        self.themeChanged.emit(theme_id)
+        self.accept()
+
+# 使用HanabiDialog的新设计设置对话框
+class HanabiSettingsDialog(HanabiDialog):
+    settingsChanged = Signal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent, title="设置中心", width=800, height=550)
+        
+        # 初始化设置
+        self.settings = {
+            "general": {
+                "startup": {
+                    "auto_start": False,
+                    "remember_window": True,
+                    "reopen_files": True
+                },
+                "file": {
+                    "default_save_path": os.path.join(os.path.expanduser("~"), "Documents", "HanabiNotes"),
+                    "auto_save": True,
+                    "auto_save_interval": 5
+                },
+                "other": {
+                    "show_status_bar": True,
+                    "enable_sound_effects": False
+                }
+            },
+            "editor": {
+                "font": {
+                    "family": "Consolas",
+                    "size": 15
+                },
+                "editing": {
+                    "auto_indent": True,
+                    "line_numbers": True,
+                    "spell_check": False,
+                    "word_wrap": True
+                }
+            }
+        }
+        
+        # 加载现有设置
+        self.loadSettings()
+        
+        # 初始化界面
+        self.initUI()
+    
+    def initUI(self):
+        # 快速实现一个基本的设置对话框
+        # 更详细的实现将在后续完成
+        
+        # 获取主题颜色
+        text_color = self.theme_colors["text"]
+        primary_color = self.theme_colors["primary"]
+        bg_color = self.theme_colors["background"]
+        border_color = self.theme_colors["border"]
+        hover_color = self.theme_colors["hover"]
+        font_family = self.theme_colors["font_family"]
+        is_dark = self.theme_colors["is_dark"]
+        
+        # 创建主布局和内容
+        main_widget = QWidget()
+        main_layout = QHBoxLayout(main_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(20)
+        
+        # 左侧导航栏
+        nav_widget = QWidget()
+        nav_widget.setObjectName("navWidget")
+        nav_widget.setFixedWidth(200)
+        nav_layout = QVBoxLayout(nav_widget)
+        nav_layout.setContentsMargins(15, 15, 15, 15)
+        nav_layout.setSpacing(8)
+        
+        # 添加标志和标题
+        logo_label = QLabel(IconProvider.get_icon("settings"))
+        logo_label.setFont(IconProvider.get_icon_font(28))
+        logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setStyleSheet(f"color: {primary_color};")
+        
+        title_label = QLabel("设置中心")
+        title_label.setFont(FontManager.get_font(font_family, 16, bold=True))
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet(f"color: {text_color};")
+        
+        # 导航列表
+        self.navListWidget = QListWidget()
+        self.navListWidget.setFrameShape(QFrame.NoFrame)
+        self.navListWidget.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {QColor(bg_color).darker(110).name() if is_dark else QColor(bg_color).lighter(90).name()};
+                border: none;
+                border-radius: 10px;
+                color: {text_color};
+                padding: 8px;
+            }}
+            QListWidget::item {{
+                padding: 14px 12px;
+                border-radius: 8px;
+                margin-bottom: 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {primary_color};
+                color: white;
+            }}
+            QListWidget::item:hover:!selected {{
+                background-color: {hover_color};
+            }}
+        """)
+        
+        # 图标字体
+        icon_font = IconProvider.get_icon_font(16)
+        
+        # 添加导航项
+        generalItem = QListWidgetItem(IconProvider.get_icon("home") + " 常规设置")
+        generalItem.setFont(icon_font)
+        self.navListWidget.addItem(generalItem)
+        
+        editorItem = QListWidgetItem(IconProvider.get_icon("edit") + " 编辑器")
+        editorItem.setFont(icon_font)
+        self.navListWidget.addItem(editorItem)
+        
+        appearanceItem = QListWidgetItem(IconProvider.get_icon("palette") + " 外观")
+        appearanceItem.setFont(icon_font)
+        self.navListWidget.addItem(appearanceItem)
+        
+        aboutItem = QListWidgetItem(IconProvider.get_icon("info") + " 关于")
+        aboutItem.setFont(icon_font)
+        self.navListWidget.addItem(aboutItem)
+        
+        # 添加到导航布局
+        nav_layout.addWidget(logo_label)
+        nav_layout.addWidget(title_label)
+        nav_layout.addSpacing(20)
+        nav_layout.addWidget(self.navListWidget, 1)
+        
+        # 版本标签
+        version_label = QLabel("花火笔记 v1.0.0")
+        version_label.setAlignment(Qt.AlignCenter)
+        version_label.setStyleSheet(f"color: {QColor(text_color).lighter(130).name() if is_dark else QColor(text_color).darker(130).name()};")
+        nav_layout.addWidget(version_label)
+        
+        # 右侧内容区
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 内容堆栈
+        self.contentStack = QTabWidget()
+        self.contentStack.tabBar().setVisible(False)
+        self.contentStack.setStyleSheet("border: none;")
+        
+        # 添加页面
+        self.generalPage = QWidget()
+        self.editorPage = QWidget()
+        self.appearancePage = QWidget()
+        self.aboutPage = QWidget()
+        
+        # 简单内容（后续将增强）
+        generalLayout = QVBoxLayout(self.generalPage)
+        generalLayout.addWidget(QLabel("常规设置页面"))
+        
+        editorLayout = QVBoxLayout(self.editorPage)
+        editorLayout.addWidget(QLabel("编辑器设置页面"))
+        
+        appearanceLayout = QVBoxLayout(self.appearancePage)
+        appearanceLayout.addWidget(QLabel("外观设置页面"))
+        
+        aboutLayout = QVBoxLayout(self.aboutPage)
+        aboutLayout.addWidget(QLabel("关于页面"))
+        
+        # 添加到堆栈
+        self.contentStack.addTab(self.generalPage, "常规设置")
+        self.contentStack.addTab(self.editorPage, "编辑器")
+        self.contentStack.addTab(self.appearancePage, "外观")
+        self.contentStack.addTab(self.aboutPage, "关于")
+        
+        content_layout.addWidget(self.contentStack)
+        
+        # 添加到主布局
+        main_layout.addWidget(nav_widget)
+        main_layout.addWidget(content_widget, 1)
+        
+        # 添加到对话框
+        self.content_layout.addWidget(main_widget)
+        
+        # 添加底部按钮
+        self.add_cancel_button("取消", "close")
+        self.add_ok_button("保存设置", "save")
         
         # 连接信号
-        self.closeButton.clicked.connect(self.accept)
-        self.importButton.clicked.connect(self.importTheme)
+        self.navListWidget.currentRowChanged.connect(self.contentStack.setCurrentIndex)
+        self.ok_button.clicked.connect(self.saveSettings)
         
-        # 应用样式
-        self.applyStyle()
-        
-    def addDefaultThemeCards(self, layout):
-        # 添加默认的三个主题卡片
-        darkCard = self.createThemeCard("dark", "暗色主题")
-        lightCard = self.createThemeCard("light", "亮色主题")
-        blueCard = self.createThemeCard("blue", "海蓝主题")
-        
-        self.themeCards.append(darkCard)
-        self.themeCards.append(lightCard)
-        self.themeCards.append(blueCard)
-        
-        layout.addWidget(darkCard, 0, 0)
-        layout.addWidget(lightCard, 0, 1)
-        layout.addWidget(blueCard, 0, 2)
+        # 默认选中第一项
+        self.navListWidget.setCurrentRow(0)
     
-    def createThemeCard(self, themeName, displayName):
-        card = QFrame()
-        card.setObjectName(f"themeCard_{themeName}")
-        card.setFixedSize(220, 180)
-        card.setCursor(Qt.PointingHandCursor)
-        card.setProperty("themeName", themeName)
-        card.setFocusPolicy(Qt.NoFocus)
-        
-        # 根据主题名称设置卡片样式
-        if themeName == "dark":
-            bg_color = "#1e2128"
-            title_bar_color = "#1e2128"
-            icon_bg_color = "#303540"
-            icon_color = "#6b9fff"
-            text_color = "#e0e5ec"
-            editor_bg = "#1e2128"
-            editor_text = "#e0e0e0"
-            border_color = "#6b9fff"
-            
-            card.setStyleSheet(f"""
-                #themeCard_dark {{
-                background-color: {bg_color};
-                border: 2px solid transparent;
-                border-radius: 10px;
-                }}
-                #themeCard_dark:hover {{
-                border-color: {border_color};
-                }}
-                #themePreview_dark {{
-                background-color: {bg_color};
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                }}
-                #themeTitle_dark, #themeDesc_dark {{
-                color: {text_color};
-                }}
-                #previewTitleBar_dark {{
-                background-color: {title_bar_color};
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                }}
-                #previewIcon_dark {{
-                background-color: {icon_bg_color};
-                border-radius: 6px;
-                color: {icon_color};
-                }}
-                #previewEditor_dark {{
-                background-color: {editor_bg};
-                color: {editor_text};
-                border: none;
-                border-bottom-left-radius: 4px;
-                border-bottom-right-radius: 4px;
-                }}
-            """)
-            if themeName == self.currentTheme:
-                card.setStyleSheet(card.styleSheet() + f"""
-                    #themeCard_dark {{
-                    border-color: {border_color};
-                    }}
-                """)
-        elif themeName == "light":
-            bg_color = "#f5f5f5"
-            title_bar_color = "#f5f5f5"
-            icon_bg_color = "#e0e0e0"
-            icon_color = "#333333"
-            text_color = "#333333"
-            editor_bg = "#ffffff"
-            editor_text = "#333333"
-            border_color = "#666666"
-            
-            card.setStyleSheet(f"""
-                #themeCard_light {{
-                background-color: {bg_color};
-                border: 2px solid transparent;
-                border-radius: 10px;
-                }}
-                #themeCard_light:hover {{
-                border-color: {border_color};
-                }}
-                #themePreview_light {{
-                background-color: {bg_color};
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                }}
-                #themeTitle_light, #themeDesc_light {{
-                color: {text_color};
-                }}
-                #previewTitleBar_light {{
-                background-color: {title_bar_color};
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                }}
-                #previewIcon_light {{
-                background-color: {icon_bg_color};
-                border-radius: 6px;
-                color: {icon_color};
-                }}
-                #previewEditor_light {{
-                background-color: {editor_bg};
-                color: {editor_text};
-                border: none;
-                border-bottom-left-radius: 4px;
-                border-bottom-right-radius: 4px;
-                }}
-            """)
-            if themeName == self.currentTheme:
-                card.setStyleSheet(card.styleSheet() + f"""
-                    #themeCard_light {{
-                    border-color: {border_color};
-                    }}
-                """)
-        elif themeName == "blue":
-            bg_color = "#0d2b45"
-            title_bar_color = "#0d2b45"
-            icon_bg_color = "#1d3e5c"
-            icon_color = "#76c5ff"
-            text_color = "#e0f0ff"
-            editor_bg = "#0d2b45"
-            editor_text = "#e0f0ff"
-            border_color = "#76c5ff"
-            
-            card.setStyleSheet(f"""
-                #themeCard_blue {{
-                background-color: {bg_color};
-                border: 2px solid transparent;
-                border-radius: 10px;
-                }}
-                #themeCard_blue:hover {{
-                border-color: {border_color};
-                }}
-                #themePreview_blue {{
-                background-color: {bg_color};
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                }}
-                #themeTitle_blue, #themeDesc_blue {{
-                color: {text_color};
-                }}
-                #previewTitleBar_blue {{
-                background-color: {title_bar_color};
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                }}
-                #previewIcon_blue {{
-                background-color: {icon_bg_color};
-                border-radius: 6px;
-                color: {icon_color};
-                }}
-                #previewEditor_blue {{
-                background-color: {editor_bg};
-                color: {editor_text};
-                border: none;
-                border-bottom-left-radius: 4px;
-                border-bottom-right-radius: 4px;
-                }}
-            """)
-            if themeName == self.currentTheme:
-                card.setStyleSheet(card.styleSheet() + f"""
-                    #themeCard_blue {{
-                    border-color: {border_color};
-                    }}
-                """)
-        else:
-            # 自定义主题的默认样式
-            bg_color = "#252932"
-            title_bar_color = "#252932"
-            icon_bg_color = "#303540"
-            icon_color = "#6b9fff"
-            text_color = "#e0e5ec"
-            editor_bg = "#1e2128"
-            editor_text = "#e0e0e0"
-            border_color = "#6b9fff"
-            
-            # 尝试从主题管理器中获取实际颜色
-            if self.themeManager and self.themeManager.themes.get(themeName):
-                theme = self.themeManager.themes.get(themeName)
-                if hasattr(theme, 'get'):
-                    bg_color = theme.get("window.background", bg_color)
-                    title_bar_color = theme.get("title_bar.background", title_bar_color)
-                    icon_bg_color = theme.get("title_bar.icon_bg", icon_bg_color)
-                    icon_color = theme.get("title_bar.icon_color", icon_color)
-                    text_color = theme.get("title_bar.text_color", text_color)
-                    editor_bg = theme.get("editor.background", editor_bg)
-                    editor_text = theme.get("editor.text_color", editor_text)
-                    border_color = icon_color # 使用图标颜色作为边框颜色
-            
-            card.setStyleSheet(f"""
-                #themeCard_{themeName} {{
-                background-color: {bg_color};
-                border: 2px solid transparent;
-                border-radius: 10px;
-                }}
-                #themeCard_{themeName}:hover {{
-                border-color: {border_color};
-                }}
-                #themePreview_{themeName} {{
-                background-color: {bg_color};
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                }}
-                #themeTitle_{themeName}, #themeDesc_{themeName} {{
-                color: {text_color};
-                }}
-                #previewTitleBar_{themeName} {{
-                background-color: {title_bar_color};
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                }}
-                #previewIcon_{themeName} {{
-                background-color: {icon_bg_color};
-                border-radius: 6px;
-                color: {icon_color};
-                }}
-                #previewEditor_{themeName} {{
-                background-color: {editor_bg};
-                color: {editor_text};
-                border: none;
-                border-bottom-left-radius: 4px;
-                border-bottom-right-radius: 4px;
-                }}
-            """)
-            if themeName == self.currentTheme:
-                card.setStyleSheet(card.styleSheet() + f"""
-                    #themeCard_{themeName} {{
-                    border-color: {border_color};
-                    }}
-                """)
-        
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(0, 0, 0, 10)
-        layout.setSpacing(5)
-        
-        # 主题预览区
-        previewWidget = QWidget()
-        previewWidget.setFocusPolicy(Qt.NoFocus)
-        previewWidget.setObjectName(f"themePreview_{themeName}")
-        previewWidget.setFixedHeight(110)
-        previewLayout = QVBoxLayout(previewWidget)
-        previewLayout.setContentsMargins(10, 10, 10, 10)
-        previewLayout.setSpacing(0)
-        
-        # 创建一个模拟的窗口预览
-        # 标题栏
-        titleBar = QWidget()
-        titleBar.setFocusPolicy(Qt.NoFocus)
-        titleBar.setObjectName(f"previewTitleBar_{themeName}")
-        titleBar.setFixedHeight(22)
-        titleBarLayout = QHBoxLayout(titleBar)
-        titleBarLayout.setContentsMargins(8, 4, 8, 4)
-        titleBarLayout.setSpacing(5)
-        
-        # 图标
-        iconWidget = QLabel("H")
-        iconWidget.setFocusPolicy(Qt.NoFocus)
-        iconWidget.setObjectName(f"previewIcon_{themeName}")
-        iconWidget.setFixedSize(14, 14)
-        iconWidget.setAlignment(Qt.AlignCenter)
-        iconWidget.setFont(QFont("", 8, QFont.Bold))
-        
-        titleBarLayout.addWidget(iconWidget)
-        titleBarLayout.addWidget(QLabel("花火笔记"))
-        titleBarLayout.addStretch(1)
-        
-        # 添加窗口控制按钮模拟
-        controlsContainer = QWidget()
-        controlsContainer.setFocusPolicy(Qt.NoFocus)
-        controlsLayout = QHBoxLayout(controlsContainer)
-        controlsLayout.setContentsMargins(0, 0, 0, 0)
-        controlsLayout.setSpacing(4)
-        
-        for symbol in ["−", "□", "×"]:
-            btn = QLabel(symbol)
-            btn.setFocusPolicy(Qt.NoFocus)
-            btn.setFixedSize(12, 12)
-            btn.setAlignment(Qt.AlignCenter)
-            if symbol == "×":
-                btn.setStyleSheet(f"color: {'#e81123' if themeName == self.currentTheme else 'gray'};")
-            controlsLayout.addWidget(btn)
-        
-        titleBarLayout.addWidget(controlsContainer)
-        
-        # 模拟的编辑器
-        editorWidget = QLabel()
-        editorWidget.setFocusPolicy(Qt.NoFocus)
-        editorWidget.setObjectName(f"previewEditor_{themeName}")
-        editorWidget.setWordWrap(True)
-        editorWidget.setText("# 标题\n这是一段示例文本\n- 列表项1\n- 列表项2")
-        
-        # 添加到预览布局
-        previewLayout.addWidget(titleBar)
-        previewLayout.addWidget(editorWidget, 1)
-        
-        layout.addWidget(previewWidget)
-        
-        # 主题标题和描述
-        infoWidget = QWidget()
-        infoWidget.setFocusPolicy(Qt.NoFocus)
-        infoLayout = QVBoxLayout(infoWidget)
-        infoLayout.setContentsMargins(10, 0, 10, 0)
-        infoLayout.setSpacing(2)
-        
-        titleLabel = QLabel(displayName)
-        titleLabel.setFocusPolicy(Qt.NoFocus)
-        titleLabel.setObjectName(f"themeTitle_{themeName}")
-        titleLabel.setFont(QFont("", 12, QFont.Bold))
-        
-        descLabel = QLabel("点击应用此主题")
-        descLabel.setFocusPolicy(Qt.NoFocus)
-        descLabel.setObjectName(f"themeDesc_{themeName}")
-        descLabel.setFont(QFont("", 10))
-        
-        infoLayout.addWidget(titleLabel)
-        infoLayout.addWidget(descLabel)
-        
-        layout.addWidget(infoWidget)
-        
-        # 添加点击事件
-        card.mousePressEvent = lambda event, tn=themeName: self.onThemeCardClicked(tn)
-        
-        return card
-    
-    def onThemeCardClicked(self, themeName):
-        if self.themeManager and themeName != self.currentTheme:
-            try:
-                self.themeManager.set_theme(themeName)
-                self.currentTheme = themeName
-                
-                # 更新卡片选中状态
-                for card in self.themeCards:
-                    card_theme = card.property("themeName")
-                    if card_theme == themeName:
-                        # 选中状态
-                        card.setStyleSheet(card.styleSheet().replace("border: 2px solid transparent", f"border: 2px solid {'#2196f3' if themeName == 'light' else '#76c5ff' if themeName == 'blue' else '#6b9fff'}"))
-                    else:
-                        # 非选中状态
-                        card.setStyleSheet(card.styleSheet().replace(f"border: 2px solid {'#2196f3' if card_theme == 'light' else '#76c5ff' if card_theme == 'blue' else '#6b9fff'}", "border: 2px solid transparent"))
-                
-                # 发出主题变更信号
-                self.themeChanged.emit(themeName)
-            except Exception as e:
-                print(f"应用主题时出错: {str(e)}")
-    
-    def importTheme(self):
-        # 打开文件选择对话框
-        filePath, _ = QFileDialog.getOpenFileName(
-            self,
-            "选择主题文件",
-            "",
-            "JSON文件 (.json)"
-        )
-        
-        if not filePath:
-            return
-            
+    def loadSettings(self):
+        """从配置文件加载设置"""
         try:
-            # 读取主题文件
-            with open(filePath, 'r', encoding='utf-8') as f:
-                theme_data = json.load(f)
-                
-            # 检查基本结构
-            if not isinstance(theme_data, dict) or "name" not in theme_data:
-                warning(self, "导入错误", "无效的主题文件格式")
-                return
-                
-            # 获取主题名称
-            theme_name = theme_data.get("name")
-            display_name = theme_data.get("display_name", theme_name)
+            settings_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
+            settings_file = os.path.join(settings_dir, "settings.json")
             
-            # 检查是否已存在同名主题
-            if self.themeManager and theme_name in [theme[0] for theme in self.themeManager.get_all_themes()]:
-                reply = question(
-                    self, "主题已存在", f"主题 '{display_name}' 已存在。是否替换?", HanabiMessageBox.YesNo)
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    saved_settings = json.load(f)
                 
-                if reply != HanabiMessageBox.Yes_Result:
-                    return
-            
-            # 导入主题
-            if self.themeManager:
-                from Aya_Hanabi.Hanabi_Core.ThemeManager import Theme
+                # 更新设置
+                if "general" in saved_settings:
+                    self.updateSettingDict(self.settings["general"], saved_settings["general"])
                 
-                # 创建主题对象
-                theme = Theme(theme_name, theme_data)
-                
-                # 添加到主题管理器
-                self.themeManager.add_theme(theme)
-                
-                # 保存到文件
-                self.themeManager.save_theme(theme)
-                
-                # 刷新主题卡片显示
-                self.refreshThemeCards()
-                
-                information(self, "导入成功", f"主题 '{display_name}' 已成功导入")
-            else:
-                warning(self, "导入失败", "主题管理器不可用")
+                if "editor" in saved_settings:
+                    self.updateSettingDict(self.settings["editor"], saved_settings["editor"])
         except Exception as e:
-            critical(self, "导入错误", f"导入主题时出错: {str(e)}")
-            
-    def refreshThemeCards(self):
-        if not self.themeManager:
-            return
-            
-        # 清除现有卡片
-        for card in self.themeCards:
-            card.setParent(None)
-            card.deleteLater()
-            
-        self.themeCards = []
-        
-        # 重新获取主题列表
-        try:
-            # 找到装主题卡片的容器
-            scrollArea = self.findChild(QScrollArea, "themeScrollArea")
-            if not scrollArea:
-                return
-                
-            themesContainer = scrollArea.widget()
-            if not themesContainer:
-                return
-                
-            # 清除旧布局
-            if themesContainer.layout():
-                QWidget().setLayout(themesContainer.layout())
-                
-            # 创建新布局
-            themesLayout = QGridLayout(themesContainer)
-            themesLayout.setContentsMargins(0, 10, 0, 10)
-            themesLayout.setSpacing(20)
-            
-            # 添加主题卡片
-            themes = self.themeManager.get_all_themes()
-            for i, (theme_name, display_name) in enumerate(themes):
-                card = self.createThemeCard(theme_name, display_name)
-                self.themeCards.append(card)
-                row, col = divmod(i, 3)
-                themesLayout.addWidget(card, row, col)
-        except Exception as e:
-            print(f"刷新主题卡片时出错: {str(e)}")
+            print(f"加载设置时出错: {e}")
     
-    def applyStyle(self):
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #f5f5f5;
-                border-radius: 10px;
-            }
+    def updateSettingDict(self, target, source):
+        """递归更新设置字典"""
+        for key, value in source.items():
+            if key in target:
+                if isinstance(value, dict) and isinstance(target[key], dict):
+                    self.updateSettingDict(target[key], value)
+                else:
+                    target[key] = value
+    
+    def updateSetting(self, path, value):
+        """更新单个设置值"""
+        target = self.settings
+        for p in path[:-1]:
+            if p not in target:
+                target[p] = {}
+            target = target[p]
+        
+        target[path[-1]] = value
+    
+    def saveSettings(self):
+        """保存设置到配置文件"""
+        try:
+            settings_dir = os.path.join(os.path.expanduser("~"), ".hanabi_notes")
+            os.makedirs(settings_dir, exist_ok=True)
+            settings_file = os.path.join(settings_dir, "settings.json")
             
-            #titleBar {
-                background-color: #e8e8e8;
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
-            }
+            with open(settings_file, 'w', encoding='utf-8') as f:
+                json.dump(self.settings, f, ensure_ascii=False, indent=4)
             
-            #titleLabel {
-                color: #333333;
-            }
+            # 发送设置变更信号
+            self.settingsChanged.emit()
             
-            #contentWidget {
-                background-color: #f5f5f5;
-            }
-            
-            #navWidget {
-                background-color: #e8e8e8;
-                border-top-right-radius: 0px;
-                border-bottom-left-radius: 10px;
-            }
-            
-            #navListWidget {
-                background-color: transparent;
-                color: #333333;
-                font-size: 14px;
-            }
-            
-            #navListWidget::item {
-                padding: 10px;
-                border-radius: 5px;
-            }
-            
-            #navListWidget::item:selected {
-                background-color: #d0d0d0;
-            }
-            
-            #navListWidget::item:hover:!selected {
-                background-color: rgba(0, 0, 0, 0.05);
-            }
-            
-            #rightWidget {
-                background-color: #f5f5f5;
-                border-bottom-right-radius: 10px;
-                color: #333333;
-            }
-            
-            #contentStack {
-                background-color: transparent;
-                border: none;
-            }
-            
-            QLabel {
-                color: #333333;
-            }
-            
-            QPushButton {
-                background-color: #e0e0e0;
-                color: #333333;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 5px;
-            }
-            
-            QPushButton:hover {
-                background-color: #d0d0d0;
-            }
-            
-            #saveButton {
-                background-color: #0066cc;
-                color: white;
-            }
-            
-            #saveButton:hover {
-                background-color: #0055bb;
-            }
-            
-            QCheckBox {
-                color: #333333;
-            }
-            
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border-radius: 3px;
-                border: 1px solid #b0b0b0;
-                background: #ffffff;
-            }
-            
-            QCheckBox::indicator:checked {
-                background: #0066cc;
-                border: 1px solid #0066cc;
-            }
-            
-            QComboBox, QSpinBox {
-                background-color: #ffffff;
-                color: #333333;
-                border: 1px solid #d0d0d0;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            
-            QLineEdit {
-                background-color: #ffffff;
-                color: #333333;
-                border: 1px solid #d0d0d0;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            
-            QGroupBox {
-                border: 1px solid #d0d0d0;
-                border-radius: 5px;
-                margin-top: 1.5ex;
-                color: #333333;
-                font-weight: bold;
-            }
-            
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-            
-            #settingsGroup {
-                padding: 10px;
-            }
-            
-            #smallerButton, #largerButton {
-                font-size: 16px;
-                font-weight: bold;
-                padding: 0;
-            }
-            
-            #logoLabel {
-                color: #333333;
-                font-size: 24px;
-            }
-            
-            #versionLabel {
-                color: #666666;
-                font-size: 12px;
-            }
-            
-            #descLabel {
-                color: #333333;
-                font-size: 14px;
-                margin: 10px;
-            }
-            
-            #copyrightLabel {
-                color: #666666;
-                font-size: 12px;
-            }
-            
-            #linkButton {
-                background-color: transparent;
-                color: #0066cc;
-                text-decoration: underline;
-                border: none;
-            }
-            
-            #linkButton:hover {
-                color: #0055bb;
-            }
-        """)
+            # 设置结果并关闭对话框
+            self.result_value = self.Ok_Result
+            self.accept()
+        except Exception as e:
+            print(f"保存设置时出错: {e}")
+            warning(self, "错误", f"保存设置时出错: {str(e)}")
 
-from PySide6.QtWidgets import QApplication
-
+# 应用程序测试代码
 if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+    
     app = QApplication([])
-    settingsDialog = SettingsDialog()
-    settingsDialog.show()
-    app.exec()
+    
+    # 初始化字体管理器和图标
+    FontManager.init()
+    IconProvider.init_font()
+    
+    # 优先使用新的设置对话框
+    try:
+        settingsDialog = HanabiSettingsDialog()
+        result = settingsDialog.exec()
+        
+        if result == HanabiDialog.Ok_Result:
+            print("设置已保存")
+        else:
+            print("设置已取消")
+    except Exception as e:
+        # 回退到使用传统的设置对话框
+        print(f"使用新对话框失败，回退到传统对话框: {e}")
+        settingsDialog = SettingsDialog()
+        if settingsDialog.exec():
+            print("设置已保存")
+        else:
+            print("设置已取消")
+    
+    app.exec() 
 
+class HanabiPluginsPanel(QWidget):
+    """插件管理面板"""
+    
+    # 信号
+    pluginsChanged = Signal()  # 插件变更时发出信号
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.plugin_manager = None
+        self.plugins = []
+        self.initUI()
+        
+        # 获取父窗口的插件管理器
+        self.setupPluginManager()
+        
+        # 加载插件列表
+        self.loadPlugins()
+    
+    def setupPluginManager(self):
+        try:
+            # 尝试获取插件管理器
+            if self.parent and hasattr(self.parent, 'plugin_manager'):
+                self.plugin_manager = self.parent.plugin_manager
+                print("使用父窗口的插件管理器")
+            elif self.parent and hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'plugin_manager'):
+                self.plugin_manager = self.parent.parent.plugin_manager
+                print("使用父窗口的父窗口的插件管理器")
+            else:
+                # 尝试导入插件管理器
+                try:
+                    from Aya_Hanabi.Hanabi_Core.PluginManager.pluginManager import PluginManager
+                    self.plugin_manager = PluginManager()
+                    print("创建新的插件管理器")
+                except ImportError:
+                    print("无法导入PluginManager，将禁用插件功能")
+        except Exception as e:
+            print(f"设置插件管理器时出错: {e}")
+    
+    def initUI(self):
+        # 创建主布局
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(15)
+        
+        # 创建顶部工具栏
+        toolbar = QWidget()
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 刷新按钮
+        refresh_btn = QPushButton("刷新")
+        refresh_btn.setIcon(IconProvider.get_icon("refresh"))
+        refresh_btn.clicked.connect(self.refreshPlugins)
+        toolbar_layout.addWidget(refresh_btn)
+        
+        # 添加插件按钮
+        add_btn = QPushButton("添加插件")
+        add_btn.setIcon(IconProvider.get_icon("add"))
+        add_btn.clicked.connect(self.addPlugin)
+        toolbar_layout.addWidget(add_btn)
+        
+        toolbar_layout.addStretch(1)
+        
+        # 创建分隔线
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: rgba(255, 255, 255, 0.1);")
+        
+        # 创建插件列表区域
+        plugins_widget = QWidget()
+        plugins_layout = QVBoxLayout(plugins_widget)
+        plugins_layout.setContentsMargins(0, 0, 0, 0)
+        plugins_layout.setSpacing(0)
+        
+        # 创建列表和详情的水平布局
+        split_layout = QHBoxLayout()
+        split_layout.setContentsMargins(0, 0, 0, 0)
+        split_layout.setSpacing(10)
+        
+        # 创建插件列表
+        self.plugins_list = QListWidget()
+        self.plugins_list.setFrameShape(QFrame.NoFrame)
+        self.plugins_list.setIconSize(QSize(32, 32))
+        self.plugins_list.setMinimumWidth(220)
+        self.plugins_list.setMaximumWidth(280)
+        self.plugins_list.currentRowChanged.connect(self.onPluginSelected)
+        split_layout.addWidget(self.plugins_list, 1)
+        
+        # 创建详情区域
+        details_container = QWidget()
+        details_layout = QVBoxLayout(details_container)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 创建详情堆栈，用于显示插件详情或空状态
+        self.details_stack = QStackedWidget()
+        
+        # 空状态页面
+        empty_page = QWidget()
+        empty_layout = QVBoxLayout(empty_page)
+        empty_layout.setAlignment(Qt.AlignCenter)
+        
+        empty_icon = QLabel()
+        empty_icon_pixmap = IconProvider.get_icon("extension").pixmap(64, 64)
+        empty_icon.setPixmap(empty_icon_pixmap)
+        empty_icon.setAlignment(Qt.AlignCenter)
+        
+        empty_text = QLabel("选择一个插件查看详情")
+        empty_text.setAlignment(Qt.AlignCenter)
+        empty_text.setStyleSheet("color: rgba(255, 255, 255, 0.5);")
+        
+        empty_layout.addWidget(empty_icon)
+        empty_layout.addWidget(empty_text)
+        
+        # 详情页面
+        self.details_page = QWidget()
+        self.details_layout = QVBoxLayout(self.details_page)
+        
+        # 插件标题区域
+        self.title_widget = QWidget()
+        title_layout = QHBoxLayout(self.title_widget)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.plugin_icon = QLabel()
+        self.plugin_icon.setFixedSize(48, 48)
+        title_layout.addWidget(self.plugin_icon)
+        
+        title_info = QWidget()
+        title_info_layout = QVBoxLayout(title_info)
+        title_info_layout.setContentsMargins(0, 0, 0, 0)
+        title_info_layout.setSpacing(2)
+        
+        self.plugin_name = QLabel()
+        self.plugin_name.setStyleSheet("font-size: 18px; font-weight: bold;")
+        title_info_layout.addWidget(self.plugin_name)
+        
+        self.plugin_version = QLabel()
+        self.plugin_version.setStyleSheet("color: rgba(255, 255, 255, 0.7);")
+        title_info_layout.addWidget(self.plugin_version)
+        
+        title_layout.addWidget(title_info, 1)
+        
+        # 创建操作按钮
+        actions_widget = QWidget()
+        actions_layout = QHBoxLayout(actions_widget)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.setSpacing(5)
+        
+        self.settings_btn = QPushButton("")
+        self.settings_btn.setIcon(IconProvider.get_icon("settings"))
+        self.settings_btn.setToolTip("插件设置")
+        self.settings_btn.clicked.connect(self.openPluginSettings)
+        actions_layout.addWidget(self.settings_btn)
+        
+        self.toggle_btn = QPushButton("")
+        self.toggle_btn.setIcon(IconProvider.get_icon("toggle_on"))
+        self.toggle_btn.setToolTip("启用/禁用")
+        self.toggle_btn.clicked.connect(self.togglePlugin)
+        actions_layout.addWidget(self.toggle_btn)
+        
+        self.more_btn = QToolButton()
+        self.more_btn.setIcon(IconProvider.get_icon("more_vert"))
+        self.more_btn.setToolTip("更多操作")
+        self.more_btn.setPopupMode(QToolButton.InstantPopup)
+        actions_layout.addWidget(self.more_btn)
+        
+        # 创建更多操作菜单
+        self.more_menu = QMenu(self.more_btn)
+        self.uninstall_action = self.more_menu.addAction("卸载插件")
+        self.uninstall_action.triggered.connect(self.uninstallPlugin)
+        
+        self.reload_action = self.more_menu.addAction("重新加载插件")
+        self.reload_action.triggered.connect(self.reloadPlugin)
+        
+        self.more_menu.addSeparator()
+        
+        self.open_folder_action = self.more_menu.addAction("打开插件文件夹")
+        self.open_folder_action.triggered.connect(self.openPluginFolder)
+        
+        self.more_btn.setMenu(self.more_menu)
+        
+        title_layout.addWidget(actions_widget)
+        
+        # 添加分隔线
+        title_separator = QFrame()
+        title_separator.setFrameShape(QFrame.HLine)
+        title_separator.setFrameShadow(QFrame.Sunken)
+        title_separator.setStyleSheet("background-color: rgba(255, 255, 255, 0.1);")
+        
+        # 添加详情区域
+        self.description_label = QLabel()
+        self.description_label.setWordWrap(True)
+        self.description_label.setStyleSheet("margin-top: 10px; margin-bottom: 10px;")
+        
+        # 添加作者区域
+        author_widget = QWidget()
+        author_layout = QHBoxLayout(author_widget)
+        author_layout.setContentsMargins(0, 0, 0, 0)
+        
+        author_label = QLabel("作者:")
+        author_label.setFixedWidth(80)
+        author_layout.addWidget(author_label)
+        
+        self.author_value = QLabel()
+        author_layout.addWidget(self.author_value, 1)
+        
+        # 添加主页区域
+        homepage_widget = QWidget()
+        homepage_layout = QHBoxLayout(homepage_widget)
+        homepage_layout.setContentsMargins(0, 0, 0, 0)
+        
+        homepage_label = QLabel("主页:")
+        homepage_label.setFixedWidth(80)
+        homepage_layout.addWidget(homepage_label)
+        
+        self.homepage_value = QLabel()
+        self.homepage_value.setOpenExternalLinks(True)
+        homepage_layout.addWidget(self.homepage_value, 1)
+        
+        # 添加路径区域
+        path_widget = QWidget()
+        path_layout = QHBoxLayout(path_widget)
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        
+        path_label = QLabel("路径:")
+        path_label.setFixedWidth(80)
+        path_layout.addWidget(path_label)
+        
+        self.path_value = QLabel()
+        self.path_value.setWordWrap(True)
+        path_layout.addWidget(self.path_value, 1)
+        
+        # 添加依赖区域
+        deps_widget = QWidget()
+        deps_layout = QHBoxLayout(deps_widget)
+        deps_layout.setContentsMargins(0, 0, 0, 0)
+        
+        deps_label = QLabel("依赖项:")
+        deps_label.setFixedWidth(80)
+        deps_layout.addWidget(deps_label)
+        
+        self.deps_value = QLabel()
+        deps_layout.addWidget(self.deps_value, 1)
+        
+        # 将所有组件添加到详情布局
+        self.details_layout.addWidget(self.title_widget)
+        self.details_layout.addWidget(title_separator)
+        self.details_layout.addWidget(self.description_label)
+        self.details_layout.addWidget(author_widget)
+        self.details_layout.addWidget(homepage_widget)
+        self.details_layout.addWidget(path_widget)
+        self.details_layout.addWidget(deps_widget)
+        self.details_layout.addStretch(1)
+        
+        # 添加页面到堆栈
+        self.details_stack.addWidget(empty_page)  # 索引0
+        self.details_stack.addWidget(self.details_page)  # 索引1
+        
+        details_layout.addWidget(self.details_stack)
+        
+        split_layout.addWidget(details_container, 2)
+        
+        plugins_layout.addLayout(split_layout)
+        
+        # 添加所有元素到主布局
+        main_layout.addWidget(toolbar)
+        main_layout.addWidget(separator)
+        main_layout.addWidget(plugins_widget, 1)
+    
+    def loadPlugins(self):
+        """加载插件列表"""
+        try:
+            # 清除列表
+            self.plugins_list.clear()
+            self.plugins = []
+            
+            # 检查插件管理器是否可用
+            if not self.plugin_manager:
+                self.addPlaceholderItem("插件管理器不可用")
+                return
+            
+            # 获取所有插件
+            all_plugins = self.plugin_manager.get_plugins()
+            
+            # 如果没有插件，显示提示
+            if not all_plugins:
+                self.addPlaceholderItem("没有找到插件")
+                return
+            
+            # 按照名称排序
+            self.plugins = sorted(all_plugins, key=lambda p: p.metadata.name.lower())
+            
+            # 添加到列表
+            for plugin in self.plugins:
+                self.addPluginItem(plugin)
+            
+            # 默认选中第一个
+            if self.plugins_list.count() > 0:
+                self.plugins_list.setCurrentRow(0)
+            else:
+                # 如果没有项目，显示空状态
+                self.details_stack.setCurrentIndex(0)
+            
+            print(f"已加载{len(self.plugins)}个插件")
+        except Exception as e:
+            print(f"加载插件列表时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # 显示错误状态
+            self.addPlaceholderItem(f"加载插件时出错: {e}")
+    
+    def addPlaceholderItem(self, message):
+        """添加占位项"""
+        item = QListWidgetItem(message)
+        item.setIcon(IconProvider.get_icon("error"))
+        item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  # 设置为不可选中
+        self.plugins_list.addItem(item)
+        
+        # 显示空状态
+        self.details_stack.setCurrentIndex(0)
+    
+    def addPluginItem(self, plugin):
+        """添加插件到列表"""
+        # 创建列表项
+        item = QListWidgetItem(plugin.metadata.name)
+        
+        # 设置图标
+        plugin_icon = self.getPluginIcon(plugin)
+        item.setIcon(plugin_icon)
+        
+        # 存储插件ID
+        item.setData(Qt.UserRole, plugin.metadata.id)
+        
+        # 添加到列表
+        self.plugins_list.addItem(item)
+    
+    def getPluginIcon(self, plugin):
+        """获取插件图标"""
+        # 先查找插件目录下的icon.png
+        plugin_dir = plugin.metadata.path
+        icon_path = os.path.join(plugin_dir, "icon.png")
+        
+        if os.path.exists(icon_path):
+            return QIcon(icon_path)
+        
+        # 如果没有icon.png，查找metadata中的icon字段
+        if hasattr(plugin.metadata, "icon") and plugin.metadata.icon:
+            # 检查是否是绝对路径
+            if os.path.isabs(plugin.metadata.icon) and os.path.exists(plugin.metadata.icon):
+                return QIcon(plugin.metadata.icon)
+            
+            # 检查是否是相对路径
+            rel_icon_path = os.path.join(plugin_dir, plugin.metadata.icon)
+            if os.path.exists(rel_icon_path):
+                return QIcon(rel_icon_path)
+            
+            # 检查是否是内置图标名称
+            if IconProvider and hasattr(IconProvider, 'get_icon'):
+                return IconProvider.get_icon(plugin.metadata.icon)
+        
+        # 使用默认图标
+        return IconProvider.get_icon("extension")
+    
+    def onPluginSelected(self, index):
+        """插件选中时的处理"""
+        try:
+            # 检查索引是否有效
+            if index < 0 or index >= len(self.plugins):
+                # 显示空状态
+                self.details_stack.setCurrentIndex(0)
+                return
+            
+            # 获取当前选中的插件
+            plugin = self.plugins[index]
+            
+            # 设置详情页面
+            self.updatePluginDetails(plugin)
+            
+            # 显示详情页面
+            self.details_stack.setCurrentIndex(1)
+        except Exception as e:
+            print(f"处理插件选中事件时出错: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def updatePluginDetails(self, plugin):
+        """更新插件详情"""
+        try:
+            # 设置图标
+            icon = self.getPluginIcon(plugin)
+            self.plugin_icon.setPixmap(icon.pixmap(48, 48))
+            
+            # 设置名称和版本
+            self.plugin_name.setText(plugin.metadata.name)
+            self.plugin_version.setText(f"v{plugin.metadata.version}")
+            
+            # 设置描述
+            self.description_label.setText(plugin.metadata.description or "无描述")
+            
+            # 设置作者
+            self.author_value.setText(plugin.metadata.author or "未知")
+            
+            # 设置主页
+            if plugin.metadata.homepage:
+                self.homepage_value.setText(f'<a href="{plugin.metadata.homepage}">{plugin.metadata.homepage}</a>')
+            else:
+                self.homepage_value.setText("无")
+            
+            # 设置路径
+            self.path_value.setText(plugin.metadata.path)
+            
+            # 设置依赖
+            if hasattr(plugin.metadata, "dependencies") and plugin.metadata.dependencies:
+                self.deps_value.setText(", ".join(plugin.metadata.dependencies))
+            else:
+                self.deps_value.setText("无")
+            
+            # 更新按钮状态
+            # 检查是否启用
+            if plugin.is_enabled:
+                self.toggle_btn.setIcon(IconProvider.get_icon("toggle_on"))
+                self.toggle_btn.setToolTip("禁用插件")
+            else:
+                self.toggle_btn.setIcon(IconProvider.get_icon("toggle_off"))
+                self.toggle_btn.setToolTip("启用插件")
+            
+            # 检查是否支持设置
+            if hasattr(plugin, "has_settings") and plugin.has_settings:
+                self.settings_btn.setEnabled(True)
+            else:
+                self.settings_btn.setEnabled(False)
+        except Exception as e:
+            print(f"更新插件详情时出错: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def refreshPlugins(self):
+        """刷新插件列表"""
+        try:
+            # 检查插件管理器是否可用
+            if not self.plugin_manager:
+                QMessageBox.warning(self, "错误", "插件管理器不可用")
+                return
+            
+            # 扫描插件目录
+            self.plugin_manager.discover_plugins()
+            
+            # 重新加载插件列表
+            self.loadPlugins()
+        except Exception as e:
+            print(f"刷新插件列表时出错: {e}")
+            QMessageBox.warning(self, "错误", f"刷新插件列表时出错: {e}")
+    
+    def addPlugin(self):
+        """添加插件"""
+        try:
+            # 检查插件管理器是否可用
+            if not self.plugin_manager:
+                QMessageBox.warning(self, "错误", "插件管理器不可用")
+                return
+            
+            # 获取插件目录
+            plugin_dir = self.plugin_manager.plugin_dir
+            
+            # 显示文件对话框
+            options = QFileDialog.Options()
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "选择插件文件", "",
+                "插件文件 (*.py *.zip);;所有文件 (*)", options=options
+            )
+            
+            if not file_path:
+                return
+            
+            # 安装插件
+            success = self.plugin_manager.install_plugin(file_path)
+            
+            if success:
+                QMessageBox.information(self, "成功", f"插件安装成功: {os.path.basename(file_path)}")
+                
+                # 发送插件变更信号
+                self.pluginsChanged.emit()
+                
+                # 刷新插件列表
+                self.refreshPlugins()
+            else:
+                QMessageBox.warning(self, "错误", f"插件安装失败: {os.path.basename(file_path)}")
+        except Exception as e:
+            print(f"添加插件时出错: {e}")
+            QMessageBox.warning(self, "错误", f"添加插件时出错: {e}")
+    
+    def togglePlugin(self):
+        """切换插件状态（启用/禁用）"""
+        try:
+            # 获取当前选中的插件
+            index = self.plugins_list.currentRow()
+            if index < 0 or index >= len(self.plugins):
+                return
+            
+            plugin = self.plugins[index]
+            
+            # 切换状态
+            if plugin.is_enabled:
+                # 禁用插件
+                success = self.plugin_manager.disable_plugin(plugin.metadata.id)
+                if success:
+                    QMessageBox.information(self, "成功", f"插件已禁用: {plugin.metadata.name}")
+                else:
+                    QMessageBox.warning(self, "错误", f"禁用插件失败: {plugin.metadata.name}")
+            else:
+                # 启用插件
+                success = self.plugin_manager.enable_plugin(plugin.metadata.id)
+                if success:
+                    QMessageBox.information(self, "成功", f"插件已启用: {plugin.metadata.name}")
+                else:
+                    QMessageBox.warning(self, "错误", f"启用插件失败: {plugin.metadata.name}")
+            
+            # 发送插件变更信号
+            self.pluginsChanged.emit()
+            
+            # 更新UI
+            self.updatePluginDetails(plugin)
+        except Exception as e:
+            print(f"切换插件状态时出错: {e}")
+            QMessageBox.warning(self, "错误", f"切换插件状态时出错: {e}")
+    
+    def openPluginSettings(self):
+        """打开插件设置"""
+        try:
+            # 获取当前选中的插件
+            index = self.plugins_list.currentRow()
+            if index < 0 or index >= len(self.plugins):
+                return
+            
+            plugin = self.plugins[index]
+            
+            # 调用插件管理器的打开设置方法
+            self.plugin_manager.open_plugin_settings(plugin.metadata.id)
+        except Exception as e:
+            print(f"打开插件设置时出错: {e}")
+            QMessageBox.warning(self, "错误", f"打开插件设置时出错: {e}")
+    
+    def uninstallPlugin(self):
+        """卸载插件"""
+        try:
+            # 获取当前选中的插件
+            index = self.plugins_list.currentRow()
+            if index < 0 or index >= len(self.plugins):
+                return
+            
+            plugin = self.plugins[index]
+            
+            # 确认对话框
+            reply = QMessageBox.question(
+                self, "确认卸载",
+                f"确定要卸载插件 {plugin.metadata.name} 吗？\n这将删除插件的所有文件，此操作不可撤销。",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                # 卸载插件
+                success = self.plugin_manager.uninstall_plugin(plugin.metadata.id)
+                
+                if success:
+                    QMessageBox.information(self, "成功", f"插件已卸载: {plugin.metadata.name}")
+                    
+                    # 发送插件变更信号
+                    self.pluginsChanged.emit()
+                    
+                    # 刷新插件列表
+                    self.refreshPlugins()
+                else:
+                    QMessageBox.warning(self, "错误", f"卸载插件失败: {plugin.metadata.name}")
+        except Exception as e:
+            print(f"卸载插件时出错: {e}")
+            QMessageBox.warning(self, "错误", f"卸载插件时出错: {e}")
+    
+    def reloadPlugin(self):
+        """重新加载插件"""
+        try:
+            # 获取当前选中的插件
+            index = self.plugins_list.currentRow()
+            if index < 0 or index >= len(self.plugins):
+                return
+            
+            plugin = self.plugins[index]
+            
+            # 重新加载插件
+            success = self.plugin_manager.reload_plugin(plugin.metadata.id)
+            
+            if success:
+                QMessageBox.information(self, "成功", f"插件已重新加载: {plugin.metadata.name}")
+                
+                # 发送插件变更信号
+                self.pluginsChanged.emit()
+                
+                # 更新UI
+                self.updatePluginDetails(plugin)
+            else:
+                QMessageBox.warning(self, "错误", f"重新加载插件失败: {plugin.metadata.name}")
+        except Exception as e:
+            print(f"重新加载插件时出错: {e}")
+            QMessageBox.warning(self, "错误", f"重新加载插件时出错: {e}")
+    
+    def openPluginFolder(self):
+        """打开插件文件夹"""
+        try:
+            # 获取当前选中的插件
+            index = self.plugins_list.currentRow()
+            if index < 0 or index >= len(self.plugins):
+                return
+            
+            plugin = self.plugins[index]
+            
+            # 获取插件路径
+            plugin_path = plugin.metadata.path
+            
+            # 使用系统默认程序打开文件夹
+            import subprocess
+            import platform
+            
+            if platform.system() == "Windows":
+                os.startfile(plugin_path)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.call(["open", plugin_path])
+            else:  # Linux
+                subprocess.call(["xdg-open", plugin_path])
+        except Exception as e:
+            print(f"打开插件文件夹时出错: {e}")
+            QMessageBox.warning(self, "错误", f"打开插件文件夹时出错: {e}") 

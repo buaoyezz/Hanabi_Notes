@@ -240,7 +240,7 @@ def saveFile(self, savePath=None, encoding=None):
                     break
             
             if hasattr(self, 'sidebar') and hasattr(self.sidebar, 'updateTabName'):
-                activeTabIndex = self.sidebar.activeTabIndex if hasattr(self.sidebar, 'activeTabIndex') else -1
+                activeTabIndex = self.sidebar.current_tab_index if hasattr(self.sidebar, 'current_tab_index') else -1
                 if activeTabIndex >= 0:
                     self.sidebar.updateTabName(activeTabIndex, fileTitle, savePath)
             

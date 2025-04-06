@@ -2,7 +2,7 @@ import os
 import json
 import random
 import traceback
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
                               QMenu, QApplication, QMessageBox,
                               QMainWindow)
@@ -32,6 +32,9 @@ class StatusBar(QWidget):
     highlightModeChanged = Signal(bool)
     scrollToLineRequested = Signal(int)
     
+    # 类级别的状态标志，防止递归调用
+    _settings_opening = False
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(30)
@@ -39,6 +42,8 @@ class StatusBar(QWidget):
         
         self.previewMode = False
         self.highlightMode = True  # 默认开启高亮
+        self.currentFileType = "text"  # 默认文件类型
+        self.cursorPosition = {"line": 1, "column": 1}  # 默认光标位置
         
         # 从设置文件读取字体大小
         self.currentFontSize = self.loadFontSizeFromSettings()
@@ -106,11 +111,32 @@ class StatusBar(QWidget):
         leftContainer.setLayout(leftButtons)
         layout.addWidget(leftContainer)
         
+        # 中间区域 - 文件类型显示
+        middleContainer = QWidget()
+        middleContainer.setStyleSheet("background-color: transparent;")
+        middleLayout = QHBoxLayout(middleContainer)
+        middleLayout.setContentsMargins(0, 0, 0, 0)
+        middleLayout.setSpacing(15)
+        
+        self.fileTypeLabel = QLabel("文本文件")
+        self.fileTypeLabel.setToolTip("当前文件类型")
+        middleLayout.addWidget(self.fileTypeLabel)
+        
+        layout.addWidget(middleContainer)
+        
+        # 右侧区域
         rightContainer = QWidget()
         rightContainer.setStyleSheet("background-color: transparent;")
         rightLayout = QHBoxLayout(rightContainer)
         rightLayout.setContentsMargins(0, 0, 0, 0)
+        rightLayout.setSpacing(15)
         
+        # 光标位置显示
+        self.cursorPositionLabel = QLabel("第1行 第1列")
+        self.cursorPositionLabel.setToolTip("当前光标位置")
+        rightLayout.addWidget(self.cursorPositionLabel)
+        
+        # 行数显示
         self.lineCount = QLabel("0 行")
         rightLayout.addWidget(self.lineCount)
         
@@ -187,8 +213,11 @@ class StatusBar(QWidget):
                 else:
                     btn.updateStyle(icon_color=icon_color, hover_bg=bg_hover_color, active=False, active_color=active_icon_color)
             
-            # 更新行数标签样式
-            self.lineCount.setStyleSheet(f"color: {text_color}; font-size: 12px; background-color: {line_count_bg}; padding: 3px 8px; border-radius: 4px;")
+            # 更新标签样式
+            status_label_style = f"color: {text_color}; font-size: 12px; background-color: {line_count_bg}; padding: 3px 8px; border-radius: 4px;"
+            self.lineCount.setStyleSheet(status_label_style)
+            self.fileTypeLabel.setStyleSheet(status_label_style)
+            self.cursorPositionLabel.setStyleSheet(status_label_style)
         else:
             # 如果没有主题管理器，则使用 ThemeManager 中的默认主题
             try:
@@ -231,38 +260,121 @@ class StatusBar(QWidget):
                     else:
                         btn.updateStyle(icon_color=icon_color, hover_bg=bg_hover_color, active=False, active_color=active_icon_color)
                 
-                # 更新行数标签样式
-                self.lineCount.setStyleSheet(f"color: {text_color}; font-size: 12px; background-color: {line_count_bg}; padding: 3px 8px; border-radius: 4px;")
+                # 更新标签样式
+                status_label_style = f"color: {text_color}; font-size: 12px; background-color: {line_count_bg}; padding: 3px 8px; border-radius: 4px;"
+                self.lineCount.setStyleSheet(status_label_style)
+                self.fileTypeLabel.setStyleSheet(status_label_style)
+                self.cursorPositionLabel.setStyleSheet(status_label_style)
             except Exception as e:
                 print(f"使用默认主题管理器时出错: {e}")
                 log_to_file(f"使用默认主题管理器时出错: {e}")
     
+    def updateFileType(self, fileType):
+        """更新文件类型显示"""
+        self.currentFileType = fileType
+        
+        # 根据文件类型显示友好名称
+        fileTypeMap = {
+            "text": "文本文件",
+            "python": "Python",
+            "markdown": "Markdown",
+            "html": "HTML",
+            "javascript": "JavaScript",
+            "json": "JSON",
+            "c": "C",
+            "cpp": "C++",
+            "css": "CSS",
+            "java": "Java",
+            "xml": "XML",
+            "sql": "SQL",
+            "yaml": "YAML",
+            "rst": "reStructuredText"
+        }
+        
+        displayName = fileTypeMap.get(fileType, fileType.capitalize() if fileType else "未知类型")
+        self.fileTypeLabel.setText(displayName)
+        print(f"状态栏更新文件类型: {displayName}")
+    
+    def updateCursorPosition(self, line, column):
+        """更新光标位置显示"""
+        self.cursorPosition = {"line": line, "column": column}
+        self.cursorPositionLabel.setText(f"第{line}行 第{column}列")
+        print(f"状态栏更新光标位置: 第{line}行 第{column}列")
+    
     def openSettings(self):
+        # 使用类级别的标志来防止递归
+        if StatusBar._settings_opening:
+            print("警告：全局设置窗口已在打开中，已阻止重复调用")
+            return
+            
+        StatusBar._settings_opening = True
         try:
             print("正在尝试打开设置...")
             log_to_file("正在尝试打开设置...")
             
+            # 导入所需的模块
+            from PySide6.QtWidgets import QMainWindow
+            from PySide6.QtCore import QTimer
+            
             parent_obj = self.parent()
             if hasattr(parent_obj, "showSettings"):
-                parent_obj.showSettings()
+                try:
+                    print("找到父对象的 showSettings 方法，使用延迟调用...")
+                    log_to_file("找到父对象的 showSettings 方法，使用延迟调用...")
+                    # 直接调用父对象的showSettings方法
+                    parent_obj.showSettings()
+                except Exception as inner_e:
+                    error_msg = f"调用父对象的 showSettings 方法时出错: {inner_e}"
+                    print(error_msg)
+                    log_to_file(error_msg)
+                    import traceback
+                    trace_info = traceback.format_exc()
+                    print(trace_info)
+                    log_to_file(trace_info)
+                    warning(self, "错误", f"打开设置时出错: {str(inner_e)}")
             else:
                 # 尝试使用顶层窗口
+                print("父对象没有 showSettings 方法，尝试在顶层窗口中查找...")
+                log_to_file("父对象没有 showSettings 方法，尝试在顶层窗口中查找...")
+                from PySide6.QtWidgets import QApplication
                 main_windows = [w for w in QApplication.topLevelWidgets() if isinstance(w, QMainWindow)]
                 for w in main_windows:
                     if hasattr(w, "showSettings"):
-                        w.showSettings()
-                        return
+                        try:
+                            print(f"在顶层窗口中找到 showSettings 方法，直接调用...")
+                            log_to_file(f"在顶层窗口中找到 showSettings 方法，直接调用...")
+                            # 直接调用方法，不使用延迟
+                            w.showSettings()
+                            return
+                        except Exception as inner_e:
+                            error_msg = f"调用顶层窗口的 showSettings 方法时出错: {inner_e}"
+                            print(error_msg)
+                            log_to_file(error_msg)
+                            import traceback
+                            trace_info = traceback.format_exc()
+                            print(trace_info)
+                            log_to_file(trace_info)
+                            warning(self, "错误", f"打开设置时出错: {str(inner_e)}")
                 
                 # 如果找不到具有showSettings方法的窗口，显示默认消息
+                print("找不到具有 showSettings 方法的窗口，显示默认消息...")
+                log_to_file("找不到具有 showSettings 方法的窗口，显示默认消息...")
                 information(self, "设置", "设置功能即将推出！")
         except Exception as e:
             error_msg = f"打开设置时出错: {e}"
             print(error_msg)
             log_to_file(error_msg)
+            import traceback
             trace_info = traceback.format_exc()
             print(trace_info)
             log_to_file(trace_info)
             warning(self, "错误", f"打开设置时出错: {str(e)}")
+        finally:
+            # 20毫秒后释放锁，给对话框足够的时间初始化
+            def release_lock():
+                StatusBar._settings_opening = False
+                print("设置窗口锁定已释放")
+            QTimer.singleShot(1000, release_lock)
     
     def toggleHighlightMode(self):
         self.highlightMode = not self.highlightMode

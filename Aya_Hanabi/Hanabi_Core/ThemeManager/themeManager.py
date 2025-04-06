@@ -92,8 +92,260 @@ class ThemeManager:
             }
         }
         
-        # 只添加暗色主题
+        # 亮色主题
+        light_theme = {
+            "name": "light",
+            "display_name": "亮色主题",
+            "window": {
+                "background": "#f5f5f5",
+                "border": "#e0e0e0",
+                "radius": "10px"
+            },
+            "title_bar": {
+                "background": "#f5f5f5",
+                "text_color": "#333333",
+                "icon_bg": "#e0e0e0",
+                "icon_color": "#4183c4"
+            },
+            "editor": {
+                "background": "#ffffff",
+                "text_color": "#333333",
+                "selection_color": "#a6c9ff",
+                "cursor_color": "#333333",
+                "line_height": "1.5",
+                "border_color": "#e0e0e0",
+                "preserve_font_size": True
+            },
+            "scrollbar": {
+                "background": "transparent",
+                "handle_color": "rgba(0, 0, 0, 0.2)",
+                "handle_hover_color": "rgba(0, 0, 0, 0.4)",
+                "width": "6px",
+                "radius": "3px"
+            },
+            "status_bar": {
+                "background": "#f0f0f0",
+                "text_color": "#333333",
+                "icon_color": "rgba(0, 0, 0, 0.7)",
+                "active_icon_color": "#4183c4",
+                "hover_bg": "rgba(0, 0, 0, 0.05)",
+                "line_count_bg": "rgba(0, 0, 0, 0.1)"
+            },
+            "sidebar": {
+                "background": "#f0f0f0",
+                "text_color": "#333333",
+                "active_tab_bg": "#e0e0e0",
+                "hover_tab_bg": "rgba(0, 0, 0, 0.05)",
+                "icon_color": "rgba(0, 0, 0, 0.7)"
+            },
+            "preview": {
+                "background": "#ffffff",
+                "text_color": "#333333",
+                "heading_color": "#000000",
+                "link_color": "#4183c4",
+                "code_bg": "rgba(0, 0, 0, 0.05)",
+                "blockquote_color": "#6a737d",
+                "blockquote_border": "#dfe2e5",
+                "table_border": "#dfe2e5"
+            },
+            "highlight": {
+                "line_color": "rgba(65, 131, 196, 0.2)",
+                "flash_color": "rgba(65, 131, 196, 0.4)"
+            }
+        }
+        
+        # 紫梦主题
+        purple_dream_theme = {
+            "name": "purple_dream",
+            "display_name": "紫梦主题",
+            "window": {
+                "background": "#292841",
+                "border": "#362f5a",
+                "radius": "10px"
+            },
+            "title_bar": {
+                "background": "#292841",
+                "text_color": "#e0dbff",
+                "icon_bg": "#362f5a",
+                "icon_color": "#a694ff"
+            },
+            "editor": {
+                "background": "#292841",
+                "text_color": "#e0dbff",
+                "selection_color": "#6c60b3",
+                "cursor_color": "#e0dbff",
+                "line_height": "1.5",
+                "border_color": "#362f5a",
+                "preserve_font_size": True
+            },
+            "scrollbar": {
+                "background": "transparent",
+                "handle_color": "rgba(224, 219, 255, 0.3)",
+                "handle_hover_color": "rgba(224, 219, 255, 0.5)",
+                "width": "6px",
+                "radius": "3px"
+            },
+            "status_bar": {
+                "background": "#221f36",
+                "text_color": "#e0dbff",
+                "icon_color": "rgba(224, 219, 255, 0.7)",
+                "active_icon_color": "#a694ff",
+                "hover_bg": "rgba(224, 219, 255, 0.1)",
+                "line_count_bg": "rgba(0, 0, 0, 0.2)"
+            },
+            "sidebar": {
+                "background": "#2e2c49",
+                "text_color": "#e0dbff",
+                "active_tab_bg": "#3a3660",
+                "hover_tab_bg": "rgba(224, 219, 255, 0.08)",
+                "icon_color": "rgba(224, 219, 255, 0.7)"
+            },
+            "preview": {
+                "background": "#292841",
+                "text_color": "#e0dbff",
+                "heading_color": "#ffffff",
+                "link_color": "#a694ff",
+                "code_bg": "rgba(224, 219, 255, 0.1)",
+                "blockquote_color": "#b9b4d8",
+                "blockquote_border": "#4a4169",
+                "table_border": "#4a4169"
+            },
+            "highlight": {
+                "line_color": "rgba(166, 148, 255, 0.25)",
+                "flash_color": "rgba(166, 148, 255, 0.4)"
+            }
+        }
+        
+        # 森林绿主题
+        green_theme = {
+            "name": "green_theme",
+            "display_name": "森林绿主题",
+            "window": {
+                "background": "#213430",
+                "border": "#2c4a44",
+                "radius": "10px"
+            },
+            "title_bar": {
+                "background": "#213430",
+                "text_color": "#d8f0ea",
+                "icon_bg": "#2c4a44",
+                "icon_color": "#5fcea1"
+            },
+            "editor": {
+                "background": "#213430",
+                "text_color": "#d8f0ea",
+                "selection_color": "#3e8a6e",
+                "cursor_color": "#d8f0ea",
+                "line_height": "1.5",
+                "border_color": "#2c4a44",
+                "preserve_font_size": True
+            },
+            "scrollbar": {
+                "background": "transparent",
+                "handle_color": "rgba(216, 240, 234, 0.3)",
+                "handle_hover_color": "rgba(216, 240, 234, 0.5)",
+                "width": "6px",
+                "radius": "3px"
+            },
+            "status_bar": {
+                "background": "#1a2a26",
+                "text_color": "#d8f0ea",
+                "icon_color": "rgba(216, 240, 234, 0.7)",
+                "active_icon_color": "#5fcea1",
+                "hover_bg": "rgba(216, 240, 234, 0.1)",
+                "line_count_bg": "rgba(0, 0, 0, 0.2)"
+            },
+            "sidebar": {
+                "background": "#263e38",
+                "text_color": "#d8f0ea",
+                "active_tab_bg": "#2f4f47",
+                "hover_tab_bg": "rgba(216, 240, 234, 0.08)",
+                "icon_color": "rgba(216, 240, 234, 0.7)"
+            },
+            "preview": {
+                "background": "#213430",
+                "text_color": "#d8f0ea",
+                "heading_color": "#ffffff",
+                "link_color": "#5fcea1",
+                "code_bg": "rgba(216, 240, 234, 0.1)",
+                "blockquote_color": "#b6d8d0",
+                "blockquote_border": "#3c6056",
+                "table_border": "#3c6056"
+            },
+            "highlight": {
+                "line_color": "rgba(95, 206, 161, 0.25)",
+                "flash_color": "rgba(95, 206, 161, 0.4)"
+            }
+        }
+        
+        # 银白主题
+        silvery_white_theme = {
+            "name": "silvery_white",
+            "display_name": "银白主题",
+            "window": {
+                "background": "#f0f3f7",
+                "border": "#e1e6ed",
+                "radius": "10px"
+            },
+            "title_bar": {
+                "background": "#f0f3f7",
+                "text_color": "#4a5568",
+                "icon_bg": "#e1e6ed",
+                "icon_color": "#5a8de6"
+            },
+            "editor": {
+                "background": "#ffffff",
+                "text_color": "#4a5568",
+                "selection_color": "#bfdbff",
+                "cursor_color": "#4a5568",
+                "line_height": "1.5",
+                "border_color": "#e1e6ed",
+                "preserve_font_size": True
+            },
+            "scrollbar": {
+                "background": "transparent",
+                "handle_color": "rgba(74, 85, 104, 0.2)",
+                "handle_hover_color": "rgba(74, 85, 104, 0.4)",
+                "width": "6px",
+                "radius": "3px"
+            },
+            "status_bar": {
+                "background": "#e7ebf3",
+                "text_color": "#4a5568",
+                "icon_color": "rgba(74, 85, 104, 0.7)",
+                "active_icon_color": "#5a8de6",
+                "hover_bg": "rgba(74, 85, 104, 0.05)",
+                "line_count_bg": "rgba(74, 85, 104, 0.1)"
+            },
+            "sidebar": {
+                "background": "#e7ebf3",
+                "text_color": "#4a5568",
+                "active_tab_bg": "#d9e1ec",
+                "hover_tab_bg": "rgba(74, 85, 104, 0.05)",
+                "icon_color": "rgba(74, 85, 104, 0.7)"
+            },
+            "preview": {
+                "background": "#ffffff",
+                "text_color": "#4a5568",
+                "heading_color": "#2d3748",
+                "link_color": "#5a8de6",
+                "code_bg": "rgba(74, 85, 104, 0.05)",
+                "blockquote_color": "#718096",
+                "blockquote_border": "#e1e6ed",
+                "table_border": "#e1e6ed"
+            },
+            "highlight": {
+                "line_color": "rgba(90, 141, 230, 0.15)",
+                "flash_color": "rgba(90, 141, 230, 0.3)"
+            }
+        }
+        
+        # 添加所有主题
         self.add_theme(Theme("dark", dark_theme))
+        self.add_theme(Theme("light", light_theme))
+        self.add_theme(Theme("purple_dream", purple_dream_theme))
+        self.add_theme(Theme("green_theme", green_theme))
+        self.add_theme(Theme("silvery_white", silvery_white_theme))
         
         # 设置默认主题
         self.set_theme(self.default_theme_name)
